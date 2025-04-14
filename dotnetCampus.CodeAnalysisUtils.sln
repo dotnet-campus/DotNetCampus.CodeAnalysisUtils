@@ -2,11 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.34916.146
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dotnetCampus.CodeAnalysisUtils", "src\dotnetCampus.CodeAnalysisUtils\dotnetCampus.CodeAnalysisUtils.csproj", "{96D6B633-B848-484B-B6C5-50CDB69338E6}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{E5AC6427-27C1-4902-B001-D36B32DBE114}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dotnetCampus.CodeAnalysisUtils.Tests", "tests\dotnetCampus.CodeAnalysisUtils.Tests\dotnetCampus.CodeAnalysisUtils.Tests.csproj", "{322D6BA9-9654-4E86-8666-87CFCA4C8406}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNetCampus.CodeAnalysisUtils", "src\DotNetCampus.CodeAnalysisUtils\DotNetCampus.CodeAnalysisUtils.csproj", "{96D6B633-B848-484B-B6C5-50CDB69338E6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6E7697B2-AB98-4292-859F-2DF130506A83}"
 	ProjectSection(SolutionItems) = preProject
@@ -30,13 +26,8 @@ Global
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{322D6BA9-9654-4E86-8666-87CFCA4C8406}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{322D6BA9-9654-4E86-8666-87CFCA4C8406}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{322D6BA9-9654-4E86-8666-87CFCA4C8406}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{322D6BA9-9654-4E86-8666-87CFCA4C8406}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{322D6BA9-9654-4E86-8666-87CFCA4C8406} = {E5AC6427-27C1-4902-B001-D36B32DBE114}
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
