@@ -13,6 +13,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6E7697B2
 		README.md = README.md
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A6089B7E-9528-4B78-9B8E-C9C173D9D3B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotNetCampus.CodeAnalysis.Tests", "tests\DotNetCampus.CodeAnalysis.Tests\DotNetCampus.CodeAnalysis.Tests.csproj", "{287E7364-300A-47EE-9EBD-51B99CB7C7E7}"
+EndProject
 Global
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {74F16CF5-45E1-4E2C-93E6-B48A39A66B46}
@@ -26,8 +30,13 @@ Global
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{96D6B633-B848-484B-B6C5-50CDB69338E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{287E7364-300A-47EE-9EBD-51B99CB7C7E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{287E7364-300A-47EE-9EBD-51B99CB7C7E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{287E7364-300A-47EE-9EBD-51B99CB7C7E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{287E7364-300A-47EE-9EBD-51B99CB7C7E7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{287E7364-300A-47EE-9EBD-51B99CB7C7E7} = {A6089B7E-9528-4B78-9B8E-C9C173D9D3B4}
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
