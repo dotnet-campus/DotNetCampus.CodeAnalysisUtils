@@ -1,15 +1,34 @@
 <Project>
 
+  <!-- 这里是 DotNetCampus.CodeAnalysisUtils 库的打包版本号 -->
   <Import Project="build\Version.props" />
 
   <!-- 框架和语言信息 -->
   <PropertyGroup>
+    <!-- 语言 -->
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    <ImplicitUsings>true</ImplicitUsings>
+    <!-- 构建 -->
+    <Deterministic>true</Deterministic>
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts\</ArtifactsPath>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!--
+      Adding NoWarn to remove build warnings
+      NU1507: Warning when there are multiple package sources when using CPM with no source mapping
+    -->
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+    <!--
+      CA1416: 平台兼容性警告
+    -->
+    <WarningsAsErrors>$(WarningAsErrors);CA1416</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- 自定义属性 -->
+  <PropertyGroup>
+    <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    <ThisYear>$([System.DateTime]::Now.ToString(`yyyy`))</ThisYear>
   </PropertyGroup>
 
   <!--库信息 -->
@@ -17,7 +36,7 @@
     <Description>为 dotnetCampus 组织下项目内附带的源分析器/源生成器提供公共方法。</Description>
     <Authors>dotnet-campus</Authors>
     <Company>dotnet campus（.NET 职业技术学院）</Company>
-    <Copyright>Copyright 2024-$([System.DateTime]::Now.ToString(`yyyy`)) &#169; dotnet campus, All Rights Reserved.</Copyright>
+    <Copyright>Copyright 2024-$(ThisYear) &#169; dotnet campus, All Rights Reserved.</Copyright>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/dotnet-campus/DotNetCampus.CodeAnalysisUtils</RepositoryUrl>
     <PackageProjectUrl>https://github.com/dotnet-campus/DotNetCampus.CodeAnalysisUtils</PackageProjectUrl>

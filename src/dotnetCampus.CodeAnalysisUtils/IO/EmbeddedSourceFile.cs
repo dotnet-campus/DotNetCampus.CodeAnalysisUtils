@@ -9,6 +9,7 @@
 /// <param name="Content">文件的文本内容。</param>
 internal readonly record struct EmbeddedSourceFile(
     string FileName,
+    string FileRelativePath,
     string TypeName,
     string Namespace,
     string Content)
