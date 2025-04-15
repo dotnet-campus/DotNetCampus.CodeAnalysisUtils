@@ -7,23 +7,29 @@ namespace DotNetCampus.CodeAnalysis.Utils.CodeAnalysis;
 /// </summary>
 public static class TemplateRegexes
 {
+    private static Regex? _namespaceRegex;
     private static Regex? _flagRegex;
     private static Regex? _flag1Regex;
     private static Regex? _flag2Regex;
     private static Regex? _flag3Regex;
     private static Regex? _flag4Regex;
-
-    private static Regex FlagRegex => _flagRegex ??= GetFlagRegex();
-    private static Regex Flag1Regex => _flag1Regex ??= GetFlag1Regex();
-    private static Regex Flag2Regex => _flag2Regex ??= GetFlag2Regex();
-    private static Regex Flag3Regex => _flag3Regex ??= GetFlag3Regex();
-    private static Regex Flag4Regex => _flag4Regex ??= GetFlag4Regex();
-
-    private static Regex GetFlagRegex() => _flagRegex ??= new Regex(@"(?<=\n)\s+// <FLAG>.+?</FLAG>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static Regex GetFlag1Regex() => _flag2Regex ??= new Regex(@"(?<=\n)\s+// <FLAG1>.+?</FLAG1>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static Regex GetFlag2Regex() => _flag2Regex ??= new Regex(@"(?<=\n)\s+// <FLAG2>.+?</FLAG2>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static Regex GetFlag3Regex() => _flag3Regex ??= new Regex(@"(?<=\n)\s+// <FLAG3>.+?</FLAG3>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static Regex GetFlag4Regex() => _flag3Regex ??= new Regex(@"(?<=\n)\s+// <FLAG4>.+?</FLAG4>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex NamespaceRegex => _namespaceRegex ??= new Regex(@"\bnamespace\s+([\w\.]+)(?=\s*[;\{])", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex FlagRegex => _flagRegex ??= new Regex(@"(?<=\n)\s+// <FLAG>.+?</FLAG>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex Flag1Regex => _flag1Regex ??= new Regex(@"(?<=\n)\s+// <FLAG1>.+?</FLAG1>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex Flag2Regex => _flag2Regex ??= new Regex(@"(?<=\n)\s+// <FLAG2>.+?</FLAG2>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex Flag3Regex => _flag3Regex ??= new Regex(@"(?<=\n)\s+// <FLAG3>.+?</FLAG3>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static Regex Flag4Regex => _flag4Regex ??= new Regex(@"(?<=\n)\s+// <FLAG4>.+?</FLAG4>", RegexOptions.Compiled | RegexOptions.Singleline);
+ 
+    /// <summary>
+    /// 替换代码中的命名空间声明。
+    /// </summary>
+    /// <param name="content">包含要替换命名空间代码的字符串。</param>
+    /// <param name="newNamespace">新的命名空间。</param>
+    /// <returns>替换了命名空间的新代码。</returns>
+    public static string ReplaceNamespace(this string content, string newNamespace)
+    {
+        return NamespaceRegex.Replace(content, $"namespace {newNamespace}");
+    }
 
     /// <summary>
     /// 替换代码中的 // <FLAG>...</FLAG> 注释，将其替换为指定的内容。

@@ -17,6 +17,8 @@
     <!--
       Adding NoWarn to remove build warnings
       NU1507: Warning when there are multiple package sources when using CPM with no source mapping
+      NU5128: 在 nuspec 和 lib/ref 文件夹的依赖项组中声明的某些目标框架在其他位置没有完全匹配项。请参阅以下操作列表:
+              -为以下组件添加库或引用程序集 netstandard2.0 目标框架
     -->
     <NoWarn>$(NoWarn);NU1507</NoWarn>
     <!--

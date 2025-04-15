@@ -27,7 +27,10 @@ public class EmbeddedGenerator : IIncrementalGenerator
 
         foreach (var source in EmbeddedSourceFiles.Enumerate(null))
         {
-            context.AddSource(source.FileRelativePath.Replace("/", "."), SourceText.From(source.Content, Encoding.UTF8));
+            var name = source.FileRelativePath.Replace("/", ".").Replace("\\", ".");
+            var content = source.Content
+                .ReplaceNamespace(rootNamespace);
+            context.AddSource(name, SourceText.From(content, Encoding.UTF8));
         }
     }
 }
