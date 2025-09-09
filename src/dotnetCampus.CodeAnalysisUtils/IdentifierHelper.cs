@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
+using System.Linq;
 using static System.Globalization.UnicodeCategory;
 
 namespace DotNetCampus.CodeAnalysis.Utils;

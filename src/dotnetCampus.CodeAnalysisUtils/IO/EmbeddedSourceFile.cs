@@ -1,4 +1,7 @@
-﻿namespace DotNetCampus.CodeAnalysis.Utils.IO;
+﻿using System.IO;
+using System.Linq;
+
+namespace DotNetCampus.CodeAnalysis.Utils.IO;
 
 /// <summary>
 /// 嵌入的文本资源的数据。
