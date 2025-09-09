@@ -643,11 +643,6 @@ public static class SourceTextBuilderExtensions
 
     private static string SimplifyNameByAddUsing(ITypeSymbol typeSymbol, List<string> namespaces)
     {
-        if (typeSymbol.ToGlobalDisplayString().Contains("INestedFakeIpcArgumentOrReturn")
-            && typeSymbol.ToGlobalDisplayString().Contains("Task"))
-        {
-        }
-
         if (typeSymbol.Kind is SymbolKind.ArrayType)
         {
             // 数组类型（如 int[]、string[,] 等）
