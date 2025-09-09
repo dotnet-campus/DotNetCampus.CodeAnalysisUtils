@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 
-namespace DotNetCampus.CodeAnalysis.Utils.SourceTexts.Builders;
+namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 
 /// <summary>
 /// 辅助链式生成源代码文本的构建器。

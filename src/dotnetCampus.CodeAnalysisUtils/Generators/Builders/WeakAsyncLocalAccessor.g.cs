@@ -2,7 +2,7 @@
 using System;
 using System.Threading;
 
-namespace DotNetCampus.CodeAnalysis.Utils.SourceTexts.Builders;
+namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 
 /// <summary>
 /// 以弱引用的方式辅助保存 <see cref="AsyncLocal{T}"/> 的值，使其可以在异步上下文中安全地访问、修改和清除。

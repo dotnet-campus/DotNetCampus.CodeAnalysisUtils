@@ -1,6 +1,6 @@
 ﻿#nullable enable
 using System.Reflection;
-using DotNetCampus.CodeAnalysis.Utils.SourceTexts.Builders;
+using DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 using Microsoft.CodeAnalysis;
 
 namespace DotNetCampus.CodeAnalysis.Utils;
