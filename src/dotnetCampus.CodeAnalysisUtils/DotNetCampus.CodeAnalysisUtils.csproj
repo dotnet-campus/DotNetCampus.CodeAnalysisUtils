@@ -14,14 +14,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="dotnetCampus.LatestCSharpFeatures" PrivateAssets="all" />
+    <PackageReference Include="DotNetCampus.LatestCSharpFeatures" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
   </ItemGroup>
   
   <ItemGroup>
-    <EmbeddedResource Include="**\*.cs" Exclude="Generators\**;Package\**" LinkBase="." />
+    <EmbeddedResource Include="**\*.g.cs" LinkBase="." />
   </ItemGroup>
 
   <Target Name="_IncludeAllDependencies" BeforeTargets="_GetPackageFiles">

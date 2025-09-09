@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿#nullable enable
+using System.Text.RegularExpressions;
 
 namespace DotNetCampus.CodeAnalysis.Utils.CodeAnalysis;
 
@@ -19,7 +20,7 @@ public static class TemplateRegexes
     private static Regex Flag2Regex => _flag2Regex ??= new Regex(@"(?<=\n)\s+// <FLAG2>.+?</FLAG2>", RegexOptions.Compiled | RegexOptions.Singleline);
     private static Regex Flag3Regex => _flag3Regex ??= new Regex(@"(?<=\n)\s+// <FLAG3>.+?</FLAG3>", RegexOptions.Compiled | RegexOptions.Singleline);
     private static Regex Flag4Regex => _flag4Regex ??= new Regex(@"(?<=\n)\s+// <FLAG4>.+?</FLAG4>", RegexOptions.Compiled | RegexOptions.Singleline);
- 
+
     /// <summary>
     /// 替换代码中的命名空间声明。
     /// </summary>

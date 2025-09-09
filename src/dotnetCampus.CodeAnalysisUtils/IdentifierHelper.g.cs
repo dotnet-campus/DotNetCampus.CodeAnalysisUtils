@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Globalization;
 using System.Linq;
 using static System.Globalization.UnicodeCategory;

@@ -29,8 +29,9 @@ public class EmbeddedGenerator : IIncrementalGenerator
         {
             var name = source.FileRelativePath.Replace("/", ".").Replace("\\", ".");
             var content = source.Content
-                .ReplaceNamespace(rootNamespace);
-            context.AddSource(name, SourceText.From(content, Encoding.UTF8));
+                .Replace($"using {GeneratorInfo.RootNamespace}", $"using {rootNamespace}")
+                .Replace($"namespace {GeneratorInfo.RootNamespace}", $"namespace {rootNamespace}");
+            context.AddSource($"{rootNamespace}.{name}", SourceText.From(content, Encoding.UTF8));
         }
     }
 }

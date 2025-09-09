@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -18,7 +19,7 @@ internal static class EmbeddedSourceFiles
     internal static IEnumerable<EmbeddedSourceFile> Enumerate(string? folderName)
     {
         // 资源字符串格式为："{Namespace}.{Folder}.{filename}.{Extension}"
-        var desiredFolder = $"{typeof(GeneratorTools).Namespace}{(folderName is null ? "" : "." + folderName)}";
+        var desiredFolder = $"{GeneratorInfo.RootNamespace}{(folderName is null ? "" : "." + folderName)}";
         var assembly = Assembly.GetExecutingAssembly();
         foreach (var resourceName in assembly.GetManifestResourceNames())
         {
