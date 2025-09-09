@@ -27,6 +27,7 @@
 
   <Target Name="_IncludeAllDependencies" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
+      <None Include="Package\_._" Pack="true" PackagePath="lib\netstandard2.0\" />
       <None Include="$(RepositoryRoot)README.md" Pack="true" PackagePath="\" />
       <None Include="$(ArtifactsPath)bin\DotNetCampus.CodeAnalysisUtils\$(Configuration)\**\*.dll" Pack="true" PackagePath="analyzers\dotnet\cs" />
     </ItemGroup>
