@@ -118,8 +118,17 @@ internal static class AnalyzerConfigOptionsExtensions
 /// <param name="GotValue">在此之前如果获取到了所有的属性值，则为 <see langword="true"/>。</param>
 public readonly record struct AnalyzerConfigOptionResult(AnalyzerConfigOptions Options, bool GotValue)
 {
+    /// <summary>
+    /// 未能获取到值的属性名列表。
+    /// </summary>
     public required ImmutableList<string> UnsetPropertyNames { get; init; }
 
+    /// <summary>
+    /// 将当前结果与新的获取结果链接起来。只有所有的值都获取到了，才返回 <see langword="true"/>；否则返回 <see langword="false"/> 并记录未获取到值的属性名。
+    /// </summary>
+    /// <param name="result">新的获取结果。</param>
+    /// <param name="propertyName">新的属性名。</param>
+    /// <returns>链接后的结果。</returns>
     public AnalyzerConfigOptionResult Link(bool result, string propertyName)
     {
         if (result)
@@ -139,5 +148,10 @@ public readonly record struct AnalyzerConfigOptionResult(AnalyzerConfigOptions O
         };
     }
 
+    /// <summary>
+    /// 允许将结果直接用在 <see langword="if"/> 条件中。<see langword="true"/> 表示所有属性都成功获取到了。
+    /// </summary>
+    /// <param name="result">获取结果。</param>
+    /// <returns>如果所有属性都成功获取到了，返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static implicit operator bool(AnalyzerConfigOptionResult result) => result.GotValue;
 }

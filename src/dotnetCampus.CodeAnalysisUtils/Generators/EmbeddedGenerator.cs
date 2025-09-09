@@ -13,6 +13,7 @@ namespace DotNetCampus.CodeAnalysis.Utils.Generators;
 [Generator]
 public class EmbeddedGenerator : IIncrementalGenerator
 {
+    /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterSourceOutput(context.AnalyzerConfigOptionsProvider, Execute);

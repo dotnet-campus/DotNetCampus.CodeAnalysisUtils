@@ -7,6 +7,9 @@ using Microsoft.CodeAnalysis;
 
 namespace DotNetCampus.CodeAnalysis.Utils.SourceTexts.Builders;
 
+/// <summary>
+/// 辅助链式生成源代码文本的构建器。
+/// </summary>
 public class SourceTextBuilder : IDisposable
 {
     private readonly HashSet<string> _systemUsings = [];
@@ -16,18 +19,40 @@ public class SourceTextBuilder : IDisposable
     private readonly List<BracketSourceTextBuilder> _typeDeclarations = [];
     private readonly IDisposable _scope;
 
+    /// <summary>
+    /// 创建具有指定命名空间的 <see cref="SourceTextBuilder"/> 实例。<br/>
+    /// 请务必使用 <see langword="using"/> 语句来确保调用 <see cref="Dispose"/> 方法。
+    /// </summary>
+    /// <param name="namespace">命名空间。</param>
     public SourceTextBuilder(string @namespace)
     {
         Namespace = @namespace;
         _scope = SourceTextBuilderExtensions.BeginBuild(this);
     }
 
+    /// <summary>
+    /// 是否使用文件作用域的命名空间。
+    /// </summary>
     public bool UseFileScopedNamespace { get; init; } = true;
 
+    /// <summary>
+    /// 此源代码文件的命名空间。（目前一个源代码文件只支持一个命名空间。）
+    /// </summary>
     public string Namespace { get; }
 
+    /// <summary>
+    /// 缩进字符串。默认为四个空格（"    "）。
+    /// </summary>
     public string Indent { get; init; } = "    ";
 
+    /// <summary>
+    /// 源代码中每一行的换行符。默认为换行符（"\n"）。
+    /// </summary>
+    public string NewLine { get; init; } = "\n";
+
+    /// <summary>
+    /// 是否在生成的源代码文本末尾添加一个换行符。默认为 <see langword="true"/>。
+    /// </summary>
     public bool AppendNewLineAtEnd { get; init; } = true;
 
     /// <summary>
@@ -43,6 +68,11 @@ public class SourceTextBuilder : IDisposable
     /// </summary>
     public bool ShouldPrependGlobal { get; init; } = true;
 
+    /// <summary>
+    /// 添加 using 引用的命名空间。
+    /// </summary>
+    /// <param name="usingNamespace">要引用的命名空间。</param>
+    /// <returns>辅助链式调用。</returns>
     public SourceTextBuilder Using(string usingNamespace)
     {
         var ns = usingNamespace.PrependGlobal(ShouldPrependGlobal);
@@ -60,18 +90,34 @@ public class SourceTextBuilder : IDisposable
         return this;
     }
 
-    public SourceTextBuilder UsingStatic(string usingNamespace)
+    /// <summary>
+    /// 添加 using static 引用的类型。
+    /// </summary>
+    /// <param name="usingStatic">要引用的类型。</param>
+    /// <returns>辅助链式调用。</returns>
+    public SourceTextBuilder UsingStatic(string usingStatic)
     {
-        _staticUsings.Add(usingNamespace.PrependGlobal(ShouldPrependGlobal));
+        _staticUsings.Add(usingStatic.PrependGlobal(ShouldPrependGlobal));
         return this;
     }
 
+    /// <summary>
+    /// 添加类型别名。
+    /// </summary>
+    /// <param name="alias">别名。</param>
+    /// <param name="fullTypeName">完整类型名称。</param>
+    /// <returns>辅助链式调用。</returns>
     public SourceTextBuilder UsingTypeAlias(string alias, string fullTypeName)
     {
         _aliasUsings.Add($"{alias} = {fullTypeName.PrependGlobal(ShouldPrependGlobal)}");
         return this;
     }
 
+    /// <summary>
+    /// 添加原始文本块（此文本块与类型声明是平级的）。
+    /// </summary>
+    /// <param name="rawText">要添加的原始文本块。</param>
+    /// <returns>辅助链式调用。</returns>
     public SourceTextBuilder AddRawText(string rawText)
     {
         var rawDeclaration = new RawSourceTextBuilder(this)
@@ -82,6 +128,12 @@ public class SourceTextBuilder : IDisposable
         return this;
     }
 
+    /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
     public SourceTextBuilder AddTypeDeclaration(string declarationLine,
         Action<TypeDeclarationSourceTextBuilder> typeDeclarationBuilder)
     {
@@ -91,11 +143,19 @@ public class SourceTextBuilder : IDisposable
         return this;
     }
 
+    /// <summary>
+    /// 本源代码生成器包含一些指示如何生成源代码的选项，在此期间创建的文本会使用这些选项。<br/>
+    /// 在处置完成后，那些选项将不再起作用。
+    /// </summary>
     public void Dispose()
     {
         _scope.Dispose();
     }
 
+    /// <summary>
+    /// 生成源代码文本。
+    /// </summary>
+    /// <returns>生成的源代码文本。</returns>
     public override string ToString()
     {
         var builder = new StringBuilder();
@@ -103,6 +163,11 @@ public class SourceTextBuilder : IDisposable
         return builder.ToString();
     }
 
+    /// <summary>
+    /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
     public void BuildInto(StringBuilder builder, int indentLevel)
     {
         builder.AppendLine("#nullable enable");
@@ -169,14 +234,35 @@ public class SourceTextBuilder : IDisposable
     }
 }
 
+/// <summary>
+/// 带有大括号的源代码文本构建器基类。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 public abstract class BracketSourceTextBuilder(SourceTextBuilder root)
 {
+    /// <summary>
+    /// 根 <see cref="SourceTextBuilder"/> 实例。
+    /// </summary>
     public SourceTextBuilder Root => root;
 
+    /// <summary>
+    /// 获取缩进字符串。
+    /// </summary>
     public string Indent => root.Indent;
 
+    /// <summary>
+    /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
     public abstract void BuildInto(StringBuilder builder, int indentLevel);
 
+    /// <summary>
+    /// 将成员列表生成到指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
+    /// <param name="members">要生成的成员列表。</param>
     protected void BuildMembersInto(StringBuilder builder, int indentLevel, List<BracketSourceTextBuilder> members)
     {
         for (var i = 0; i < members.Count; i++)
@@ -191,20 +277,38 @@ public abstract class BracketSourceTextBuilder(SourceTextBuilder root)
     }
 }
 
+/// <summary>
+/// 类型声明源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+/// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
 public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string declarationLine) : BracketSourceTextBuilder(root)
 {
     private readonly List<string> _attributes = [];
     private readonly List<string> _baseTypes = [];
     private readonly List<BracketSourceTextBuilder> _members = [];
 
+    /// <summary>
+    /// 类型声明行（如 "public class MyClass"）。
+    /// </summary>
     public string DeclarationLine { get; } = declarationLine;
 
+    /// <summary>
+    /// 为此类型声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attribute">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
     public TypeDeclarationSourceTextBuilder AddAttribute(string attribute)
     {
         _attributes.Add(attribute);
         return this;
     }
 
+    /// <summary>
+    /// 为此类型声明添加基类或接口。
+    /// </summary>
+    /// <param name="baseTypes">要添加的基类或接口名称。</param>
+    /// <returns>辅助链式调用。</returns>
     public TypeDeclarationSourceTextBuilder AddBaseTypes(params ReadOnlySpan<string> baseTypes)
     {
         foreach (var baseType in baseTypes)
@@ -214,7 +318,13 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         return this;
     }
 
-    public TypeDeclarationSourceTextBuilder AddMemberDeclaration(string signature,
+    /// <summary>
+    /// 为此类型声明添加方法成员。
+    /// </summary>
+    /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
+    /// <param name="methodDeclarationBuilder">方法声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddMethodDeclaration(string signature,
         Action<MethodDeclarationSourceTextBuilder> methodDeclarationBuilder)
     {
         var methodDeclaration = new MethodDeclarationSourceTextBuilder(Root, signature);
@@ -223,6 +333,11 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         return this;
     }
 
+    /// <summary>
+    /// 为此类型声明添加原始成员文本（此文本块与其他成员是平级的）。
+    /// </summary>
+    /// <param name="rawTexts">要添加的原始成员文本。</param>
+    /// <returns>辅助链式调用。</returns>
     public TypeDeclarationSourceTextBuilder AddRawMembers(params ReadOnlySpan<string> rawTexts)
     {
         foreach (var rawText in rawTexts)
@@ -236,6 +351,11 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         return this;
     }
 
+    /// <summary>
+    /// 为此类型声明批量添加原始成员文本（此文本块与其他成员是平级的）。
+    /// </summary>
+    /// <param name="rawTexts">要批量添加的原始成员文本。</param>
+    /// <returns>辅助链式调用。</returns>
     public TypeDeclarationSourceTextBuilder AddRawMembers(IEnumerable<string> rawTexts)
     {
         foreach (var rawText in rawTexts)
@@ -249,6 +369,11 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         return this;
     }
 
+    /// <summary>
+    /// 将生成的类型声明源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
         foreach (var attribute in _attributes)
@@ -271,19 +396,38 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 }
 
+/// <summary>
+/// 方法声明源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+/// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
 public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : BracketSourceTextBuilder(root)
 {
     private readonly List<string> _attributes = [];
     private readonly List<List<RawSourceTextBuilder>> _statementGroups = [];
 
+    /// <summary>
+    /// 方法签名行（如 "public void MyMethod()"）。
+    /// </summary>
     public string Signature { get; } = signature;
 
+    /// <summary>
+    /// 为此方法声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attribute">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
     public MethodDeclarationSourceTextBuilder AddAttribute(string attribute)
     {
         _attributes.Add(attribute);
         return this;
     }
 
+    /// <summary>
+    /// 为此方法声明添加一组原始语句。<br/>
+    /// 这些语句之间没有空行分隔，如果需要空行分隔，请调用多次此方法。
+    /// </summary>
+    /// <param name="rawTexts">要添加的原始语句。</param>
+    /// <returns>辅助链式调用。</returns>
     public MethodDeclarationSourceTextBuilder AddRawStatements(params ReadOnlySpan<string> rawTexts)
     {
         var list = new List<RawSourceTextBuilder>(rawTexts.Length);
@@ -298,6 +442,12 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         return this;
     }
 
+    /// <summary>
+    /// 为此方法声明批量添加一组原始语句。<br/>
+    /// 这些语句之间没有空行分隔。
+    /// </summary>
+    /// <param name="rawTexts">要批量添加的原始语句。</param>
+    /// <returns>辅助链式调用。</returns>
     public MethodDeclarationSourceTextBuilder AddRawStatements(IEnumerable<string> rawTexts)
     {
         _statementGroups.Add(
@@ -310,6 +460,11 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         return this;
     }
 
+    /// <summary>
+    /// 将生成的方法声明源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
         foreach (var attribute in _attributes)
@@ -335,16 +490,31 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     }
 }
 
+/// <summary>
+/// 原始文本块源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 public class RawSourceTextBuilder(SourceTextBuilder root) : BracketSourceTextBuilder(root)
 {
+    /// <summary>
+    /// 要添加的原始文本块。
+    /// </summary>
     public required string RawText { get; init; }
 
+    /// <summary>
+    /// 将生成的原始文本块源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
         builder.AppendLineWithIndent(RawText, Indent, indentLevel);
     }
 }
 
+/// <summary>
+/// 可自动添加大括号作用域的辅助类。
+/// </summary>
 file class BracketScope : IDisposable
 {
     private readonly StringBuilder _builder;
@@ -378,6 +548,9 @@ file class BracketScope : IDisposable
     }
 }
 
+/// <summary>
+/// 空作用域辅助类（什么都不做）。这是为了能与 <see cref="BracketScope"/> 统一使用方式。
+/// </summary>
 file class EmptyScope : IDisposable
 {
     public void Dispose()
@@ -390,6 +563,11 @@ file class EmptyScope : IDisposable
     }
 }
 
+/// <summary>
+/// 一个在处置时执行指定操作的可处置对象。
+/// </summary>
+/// <param name="holdInstance">需要避免被 GC 的实例。</param>
+/// <param name="disposeAction">在处置时执行的操作。</param>
 file sealed class ActionDisposable(object holdInstance, Action disposeAction) : IDisposable
 {
     /// <summary>
@@ -411,6 +589,9 @@ file sealed class ActionDisposable(object holdInstance, Action disposeAction) : 
     }
 }
 
+/// <summary>
+/// <see cref="SourceTextBuilder"/> 的扩展方法。
+/// </summary>
 public static class SourceTextBuilderExtensions
 {
     private static readonly WeakAsyncLocalAccessor<SourceTextBuilder> SourceTextBuilderLocal = new();
