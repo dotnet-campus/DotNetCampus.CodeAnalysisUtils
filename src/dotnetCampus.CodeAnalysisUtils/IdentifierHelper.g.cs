@@ -12,7 +12,7 @@ namespace DotNetCampus.CodeAnalysis.Utils;
 internal static class IdentifierHelper
 {
     /// <summary>
-    /// 根据<paramref name="originalName"/>创建安全的字符串（根据<see cref="IsValidIdentifierChar"/>机型字符的规则校验，将不符合的字符串使用<paramref name="replacement"/>进行替换）
+    /// 根据<paramref name="originalName"/>创建安全的字符串（根据<see cref="IsValidIdentifierChar"/>进行字符的规则校验，将不符合的字符串使用<paramref name="replacement"/>进行替换）
     /// </summary>
     /// <param name="originalName">原名称（字符串）</param>
     /// <param name="ignoreReplacedIdentifierChars">忽略替换的字符数组</param>
