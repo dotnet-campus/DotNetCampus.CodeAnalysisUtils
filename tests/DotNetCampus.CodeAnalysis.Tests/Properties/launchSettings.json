@@ -3,7 +3,7 @@
   "profiles": {
     "DebugRoslynSourceGenerator": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "dotnetCampus.CodeAnalysis.Tests.csproj"
+      "targetProject": "DotNetCampus.CodeAnalysis.Tests.csproj"
     }
   }
 }

@@ -35,7 +35,7 @@
 
   <!--库信息 -->
   <PropertyGroup>
-    <Description>为 dotnetCampus 组织下项目内附带的源分析器/源生成器提供公共方法。</Description>
+    <Description>为 DotNetCampus 组织下项目内附带的源分析器/源生成器提供公共方法。</Description>
     <Authors>dotnet-campus</Authors>
     <Company>dotnet campus（.NET 职业技术学院）</Company>
     <Copyright>Copyright 2024-$(ThisYear) &#169; dotnet campus, All Rights Reserved.</Copyright>
