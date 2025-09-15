@@ -287,11 +287,48 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     private readonly List<string> _attributes = [];
     private readonly List<string> _baseTypes = [];
     private readonly List<BracketSourceTextBuilder> _members = [];
+    private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
 
     /// <summary>
     /// 类型声明行（如 "public class MyClass"）。
     /// </summary>
     public string DeclarationLine { get; } = declarationLine;
+
+    /// <summary>
+    /// 为此类型声明添加文档注释。
+    /// </summary>
+    /// <param name="documentationCommentBuilder">文档注释构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder WithDocumentationComment(Action<DocumentationCommentSourceTextBuilder> documentationCommentBuilder)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        documentationCommentBuilder(_documentationCommentBuilder);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此类型声明添加文档注释（原始字符串，需自行包含 /// 等符号）。
+    /// </summary>
+    /// <param name="documentationComment">要添加的文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder WithRawDocumentationComment(string documentationComment)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        _documentationCommentBuilder.AddRawText(documentationComment);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此类型声明添加 summary 文档注释。
+    /// </summary>
+    /// <param name="summary">要添加的 summary 文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder WithSummaryComment(string summary)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        _documentationCommentBuilder.AddSummaryComment(summary);
+        return this;
+    }
 
     /// <summary>
     /// 为此类型声明添加特性（如 [GeneratedCode(...)]）。
@@ -330,6 +367,21 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         var methodDeclaration = new MethodDeclarationSourceTextBuilder(Root, signature);
         methodDeclarationBuilder(methodDeclaration);
         _members.Add(methodDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加原始文本块（此文本块与成员声明是平级的）。
+    /// </summary>
+    /// <param name="rawText">要添加的原始文本块。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddRawText(string rawText)
+    {
+        var rawDeclaration = new RawSourceTextBuilder(Root)
+        {
+            RawText = rawText,
+        };
+        _members.Add(rawDeclaration);
         return this;
     }
 
@@ -376,6 +428,10 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     /// <param name="indentLevel">缩进级别。</param>
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
+        if (_documentationCommentBuilder is { } documentationCommentBuilder)
+        {
+            documentationCommentBuilder.BuildInto(builder, indentLevel);
+        }
         foreach (var attribute in _attributes)
         {
             builder.AppendLineWithIndent(attribute, Indent, indentLevel);
@@ -397,14 +453,120 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
 }
 
 /// <summary>
+/// 代码块源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : BracketSourceTextBuilder(root)
+{
+    private readonly List<List<BracketSourceTextBuilderInfo>> _statementGroups = [];
+
+    /// <summary>
+    /// 开始一个大括号作用域代码块。
+    /// </summary>
+    /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
+    /// <param name="codeBlockBuilder">代码块构建器。</param>
+    /// <param name="footer">作用域尾部代码，例如 else 等。</param>
+    /// <returns></returns>
+    public CodeBlockSourceTextBuilder BeginBracketScope(
+        string? header,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder,
+        string? footer = null)
+    {
+        var list = new List<BracketSourceTextBuilderInfo>();
+        if (header is not null)
+        {
+            list.Add(new RawSourceTextBuilder(Root)
+            {
+                RawText = header,
+            });
+        }
+        var codeBlock = new CodeBlockSourceTextBuilder(Root);
+        codeBlockBuilder(codeBlock);
+        list.Add(new(codeBlock, true));
+        if (footer is not null)
+        {
+            list.Add(new RawSourceTextBuilder(Root)
+            {
+                RawText = footer,
+            });
+        }
+        _statementGroups.Add(list);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此代码块声明添加一组原始语句。<br/>
+    /// 这些语句之间没有空行分隔，如果需要空行分隔，请调用多次此方法。
+    /// </summary>
+    /// <param name="rawTexts">要添加的原始语句。</param>
+    /// <returns>辅助链式调用。</returns>
+    public CodeBlockSourceTextBuilder AddRawStatements(params ReadOnlySpan<string> rawTexts)
+    {
+        var list = new List<BracketSourceTextBuilderInfo>(rawTexts.Length);
+        for (var i = 0; i < rawTexts.Length; i++)
+        {
+            list.Add(new RawSourceTextBuilder(Root)
+            {
+                RawText = rawTexts[i],
+            });
+        }
+        _statementGroups.Add(list);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此代码块声明批量添加一组原始语句。<br/>
+    /// 这些语句之间没有空行分隔。
+    /// </summary>
+    /// <param name="rawTexts">要批量添加的原始语句。</param>
+    /// <returns>辅助链式调用。</returns>
+    public CodeBlockSourceTextBuilder AddRawStatements(IEnumerable<string> rawTexts)
+    {
+        _statementGroups.Add(
+        [
+            ..rawTexts.Select(x => new RawSourceTextBuilder(Root)
+            {
+                RawText = x,
+            }),
+        ]);
+        return this;
+    }
+
+    /// <summary>
+    /// 将生成的代码块源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
+    public override void BuildInto(StringBuilder builder, int indentLevel)
+    {
+        for (var groupIndex = 0; groupIndex < _statementGroups.Count; groupIndex++)
+        {
+            if (groupIndex > 0)
+            {
+                builder.AppendLine();
+            }
+
+            for (var index = 0; index < _statementGroups[groupIndex].Count; index++)
+            {
+                var group = _statementGroups[groupIndex][index];
+                using var _ = group.ExtraIndent
+                    ? BracketScope.Begin(builder, Indent, indentLevel)
+                    : EmptyScope.Begin();
+                group.Builder.BuildInto(builder, indentLevel + 1);
+            }
+        }
+    }
+}
+
+/// <summary>
 /// 方法声明源代码文本构建器。
 /// </summary>
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
-public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : BracketSourceTextBuilder(root)
+public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : CodeBlockSourceTextBuilder(root)
 {
     private readonly List<string> _attributes = [];
-    private readonly List<List<RawSourceTextBuilder>> _statementGroups = [];
+    private readonly List<List<BracketSourceTextBuilder>> _statementGroups = [];
 
     /// <summary>
     /// 方法签名行（如 "public void MyMethod()"）。
@@ -423,22 +585,30 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     }
 
     /// <summary>
+    /// 开始一个大括号作用域代码块。
+    /// </summary>
+    /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
+    /// <param name="codeBlockBuilder">代码块构建器。</param>
+    /// <param name="footer">作用域尾部代码，例如 else 等。</param>
+    /// <returns></returns>
+    public new MethodDeclarationSourceTextBuilder BeginBracketScope(
+        string? header,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder,
+        string? footer = null)
+    {
+        base.BeginBracketScope(header, codeBlockBuilder, footer);
+        return this;
+    }
+
+    /// <summary>
     /// 为此方法声明添加一组原始语句。<br/>
     /// 这些语句之间没有空行分隔，如果需要空行分隔，请调用多次此方法。
     /// </summary>
     /// <param name="rawTexts">要添加的原始语句。</param>
     /// <returns>辅助链式调用。</returns>
-    public MethodDeclarationSourceTextBuilder AddRawStatements(params ReadOnlySpan<string> rawTexts)
+    public new MethodDeclarationSourceTextBuilder AddRawStatements(params ReadOnlySpan<string> rawTexts)
     {
-        var list = new List<RawSourceTextBuilder>(rawTexts.Length);
-        for (var i = 0; i < rawTexts.Length; i++)
-        {
-            list.Add(new RawSourceTextBuilder(Root)
-            {
-                RawText = rawTexts[i],
-            });
-        }
-        _statementGroups.Add(list);
+        base.AddRawStatements(rawTexts);
         return this;
     }
 
@@ -448,15 +618,9 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// </summary>
     /// <param name="rawTexts">要批量添加的原始语句。</param>
     /// <returns>辅助链式调用。</returns>
-    public MethodDeclarationSourceTextBuilder AddRawStatements(IEnumerable<string> rawTexts)
+    public new MethodDeclarationSourceTextBuilder AddRawStatements(IEnumerable<string> rawTexts)
     {
-        _statementGroups.Add(
-        [
-            ..rawTexts.Select(x => new RawSourceTextBuilder(Root)
-            {
-                RawText = x,
-            }),
-        ]);
+        base.AddRawStatements(rawTexts);
         return this;
     }
 
@@ -474,19 +638,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         builder.AppendLineWithIndent(Signature, Indent, indentLevel);
 
         using var _ = BracketScope.Begin(builder, Indent, indentLevel);
-
-        for (var groupIndex = 0; groupIndex < _statementGroups.Count; groupIndex++)
-        {
-            if (groupIndex > 0)
-            {
-                builder.AppendLine();
-            }
-
-            for (var index = 0; index < _statementGroups[groupIndex].Count; index++)
-            {
-                _statementGroups[groupIndex][index].BuildInto(builder, indentLevel + 1);
-            }
-        }
+        base.BuildInto(builder, indentLevel + 1);
     }
 }
 
@@ -510,6 +662,81 @@ public class RawSourceTextBuilder(SourceTextBuilder root) : BracketSourceTextBui
     {
         builder.AppendLineWithIndent(RawText, Indent, indentLevel);
     }
+}
+
+/// <summary>
+/// 文档注释源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+public class DocumentationCommentSourceTextBuilder(SourceTextBuilder root) : BracketSourceTextBuilder(root)
+{
+    private readonly List<string> _lines = [];
+
+    /// <summary>
+    /// 为此文档注释添加 summary 文档注释。
+    /// </summary>
+    /// <param name="summary">要添加的 summary 文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public DocumentationCommentSourceTextBuilder AddSummaryComment(string summary)
+    {
+        _lines.Add("/// <summary>");
+        foreach (var line in summary.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+        {
+            _lines.Add($"/// {line}");
+        }
+        _lines.Add("/// </summary>");
+        return this;
+    }
+
+    /// <summary>
+    /// 为此文档注释添加 remarks 文档注释。
+    /// </summary>
+    /// <param name="remarks">要添加的 remarks 文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public DocumentationCommentSourceTextBuilder AddRemarksComment(string remarks)
+    {
+        _lines.Add("/// <remarks>");
+        foreach (var line in remarks.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+        {
+            _lines.Add($"/// {line}");
+        }
+        _lines.Add("/// </remarks>");
+        return this;
+    }
+
+    /// <summary>
+    /// 为此文档注释添加原始文档注释（原始字符串，需自行包含 /// 等符号）。
+    /// </summary>
+    /// <param name="rawText">要添加的原始文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public DocumentationCommentSourceTextBuilder AddRawText(string rawText)
+    {
+        _lines.Add(rawText);
+        return this;
+    }
+
+    /// <summary>
+    /// 将生成的文档注释源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
+    public override void BuildInto(StringBuilder builder, int indentLevel)
+    {
+        for (var i = 0; i < _lines.Count; i++)
+        {
+            builder.AppendLineWithIndent(_lines[i], Indent, indentLevel);
+        }
+    }
+}
+
+/// <summary>
+/// 包含 <see cref="BracketSourceTextBuilder"/> 实例及其是否需要额外缩进的信息。
+/// </summary>
+/// <param name="Builder">带有大括号的源代码文本构建器实例。</param>
+/// <param name="ExtraIndent">需要额外缩进。</param>
+internal readonly record struct BracketSourceTextBuilderInfo(BracketSourceTextBuilder Builder, bool ExtraIndent)
+{
+    public static implicit operator BracketSourceTextBuilderInfo(BracketSourceTextBuilder builder) => new(builder, false);
 }
 
 /// <summary>
