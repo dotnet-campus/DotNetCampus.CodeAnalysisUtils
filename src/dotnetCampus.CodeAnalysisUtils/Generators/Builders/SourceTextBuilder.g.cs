@@ -356,6 +356,21 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 
     /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddTypeDeclaration(string declarationLine,
+        Action<TypeDeclarationSourceTextBuilder> typeDeclarationBuilder)
+    {
+        var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+        typeDeclarationBuilder(typeDeclaration);
+        _members.Add(typeDeclaration);
+        return this;
+    }
+
+    /// <summary>
     /// 为此类型声明添加方法成员。
     /// </summary>
     /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
@@ -552,7 +567,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : BracketSourceT
                 using var _ = group.ExtraIndent
                     ? BracketScope.Begin(builder, Indent, indentLevel)
                     : EmptyScope.Begin();
-                group.Builder.BuildInto(builder, indentLevel + 1);
+                group.Builder.BuildInto(builder, indentLevel + (group.ExtraIndent ? 1 : 0));
             }
         }
     }
