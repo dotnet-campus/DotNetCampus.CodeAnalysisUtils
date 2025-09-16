@@ -371,6 +371,27 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 
     /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="items">用于生成多个类型声明的数据源。</param>
+    /// <param name="declarationLineBuilder">类型声明行构建器。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddTypeDeclarations<T>(IEnumerable<T> items,
+        Func<T, string> declarationLineBuilder,
+        Action<TypeDeclarationSourceTextBuilder, T> typeDeclarationBuilder)
+    {
+        foreach (var item in items)
+        {
+            var declarationLine = declarationLineBuilder(item);
+            var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+            typeDeclarationBuilder(typeDeclaration, item);
+            _members.Add(typeDeclaration);
+        }
+        return this;
+    }
+
+    /// <summary>
     /// 为此类型声明添加方法成员。
     /// </summary>
     /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
@@ -386,17 +407,23 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 
     /// <summary>
-    /// 添加原始文本块（此文本块与成员声明是平级的）。
+    /// 为此类型声明添加方法成员。
     /// </summary>
-    /// <param name="rawText">要添加的原始文本块。</param>
+    /// <param name="items">用于生成多个方法声明的数据源。</param>
+    /// <param name="signatureBuilder">方法签名行构建器。</param>
+    /// <param name="methodDeclarationBuilder">方法声明构建器。</param>
     /// <returns>辅助链式调用。</returns>
-    public TypeDeclarationSourceTextBuilder AddRawText(string rawText)
+    public TypeDeclarationSourceTextBuilder AddMethodDeclarations<T>(IEnumerable<T> items,
+        Func<T, string> signatureBuilder,
+        Action<MethodDeclarationSourceTextBuilder> methodDeclarationBuilder)
     {
-        var rawDeclaration = new RawSourceTextBuilder(Root)
+        foreach (var item in items)
         {
-            RawText = rawText,
-        };
-        _members.Add(rawDeclaration);
+            var signature = signatureBuilder(item);
+            var methodDeclaration = new MethodDeclarationSourceTextBuilder(Root, signature);
+            methodDeclarationBuilder(methodDeclaration);
+            _members.Add(methodDeclaration);
+        }
         return this;
     }
 
@@ -433,6 +460,21 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
             };
             _members.Add(memberDeclaration);
         }
+        return this;
+    }
+
+    /// <summary>
+    /// 添加原始文本块（此文本块与成员声明是平级的）。
+    /// </summary>
+    /// <param name="rawText">要添加的原始文本块。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddRawText(string rawText)
+    {
+        var rawDeclaration = new RawSourceTextBuilder(Root)
+        {
+            RawText = rawText,
+        };
+        _members.Add(rawDeclaration);
         return this;
     }
 
