@@ -16,7 +16,7 @@ public class SourceTextBuilder : IDisposable
     private readonly HashSet<string> _otherUsings = [];
     private readonly HashSet<string> _staticUsings = [];
     private readonly HashSet<string> _aliasUsings = [];
-    private readonly List<BracketSourceTextBuilder> _typeDeclarations = [];
+    private readonly List<BracketSourceTextBuilder> _topLevelCode = [];
     private readonly IDisposable _scope;
 
     /// <summary>
@@ -38,7 +38,7 @@ public class SourceTextBuilder : IDisposable
     /// <summary>
     /// 此源代码文件的命名空间。（目前一个源代码文件只支持一个命名空间。）
     /// </summary>
-    public string Namespace { get; }
+    public string? Namespace { get; }
 
     /// <summary>
     /// 缩进字符串。默认为四个空格（"    "）。
@@ -124,7 +124,7 @@ public class SourceTextBuilder : IDisposable
         {
             RawText = rawText,
         };
-        _typeDeclarations.Add(rawDeclaration);
+        _topLevelCode.Add(rawDeclaration);
         return this;
     }
 
@@ -139,7 +139,22 @@ public class SourceTextBuilder : IDisposable
     {
         var typeDeclaration = new TypeDeclarationSourceTextBuilder(this, declarationLine);
         typeDeclarationBuilder(typeDeclaration);
-        _typeDeclarations.Add(typeDeclaration);
+        _topLevelCode.Add(typeDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加命名空间声明。
+    /// </summary>
+    /// <param name="namespace">命名空间。</param>
+    /// <param name="namespaceDeclarationBuilder">命名空间声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public SourceTextBuilder AddNamespaceDeclaration(string @namespace,
+        Action<NamespaceDeclarationSourceTextBuilder> namespaceDeclarationBuilder)
+    {
+        var namespaceDeclaration = new NamespaceDeclarationSourceTextBuilder(this, @namespace);
+        namespaceDeclarationBuilder(namespaceDeclaration);
+        _topLevelCode.Add(namespaceDeclaration);
         return this;
     }
 
@@ -195,28 +210,31 @@ public class SourceTextBuilder : IDisposable
         }
 
         // namespace
-        if (UseFileScopedNamespace)
+        if (Namespace is { } @namespace)
         {
-            builder.AppendLine($"namespace {Namespace};").AppendLine();
+            if (UseFileScopedNamespace)
+            {
+                builder.AppendLine($"namespace {Namespace};").AppendLine();
+            }
+            else
+            {
+                builder.AppendLine($"namespace {Namespace}");
+            }
         }
-        else
-        {
-            builder.AppendLine($"namespace {Namespace}");
-        }
-        using var _ = UseFileScopedNamespace
+        using var _ = UseFileScopedNamespace || Namespace is null
             ? EmptyScope.Begin()
             : BracketScope.Begin(builder, Indent, indentLevel);
         var typeIndentLevel = UseFileScopedNamespace ? 0 : indentLevel + 1;
 
         // types
-        for (var i = 0; i < _typeDeclarations.Count; i++)
+        for (var i = 0; i < _topLevelCode.Count; i++)
         {
             if (i > 0)
             {
                 builder.AppendLine();
             }
 
-            _typeDeclarations[i].BuildInto(builder, typeIndentLevel);
+            _topLevelCode[i].BuildInto(builder, typeIndentLevel);
         }
 
         // 统一化换行符
@@ -274,6 +292,59 @@ public abstract class BracketSourceTextBuilder(SourceTextBuilder root)
 
             members[i].BuildInto(builder, indentLevel);
         }
+    }
+}
+
+/// <summary>
+/// 命名空间声明源代码文本构建器。使用这种方式创建的命名空间只能是传统的大括号包裹的命名空间。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+/// <param name="namespace">命名空间。</param>
+public class NamespaceDeclarationSourceTextBuilder(SourceTextBuilder root, string @namespace) : BracketSourceTextBuilder(root)
+{
+    private readonly string _namespace = @namespace;
+    private readonly List<BracketSourceTextBuilder> _typeDeclarations = [];
+
+    /// <summary>
+    /// 添加原始文本块（此文本块与类型声明是平级的）。
+    /// </summary>
+    /// <param name="rawText">要添加的原始文本块。</param>
+    /// <returns>辅助链式调用。</returns>
+    public NamespaceDeclarationSourceTextBuilder AddRawText(string rawText)
+    {
+        var rawDeclaration = new RawSourceTextBuilder(Root)
+        {
+            RawText = rawText,
+        };
+        _typeDeclarations.Add(rawDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public NamespaceDeclarationSourceTextBuilder AddTypeDeclaration(string declarationLine,
+        Action<TypeDeclarationSourceTextBuilder> typeDeclarationBuilder)
+    {
+        var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+        typeDeclarationBuilder(typeDeclaration);
+        _typeDeclarations.Add(typeDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="indentLevel">缩进级别。</param>
+    public override void BuildInto(StringBuilder builder, int indentLevel)
+    {
+        builder.Append("namespace ").AppendLine(_namespace);
+        using var _ = BracketScope.Begin(builder, Indent, indentLevel);
+        BuildMembersInto(builder, indentLevel + 1, _typeDeclarations);
     }
 }
 
