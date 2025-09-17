@@ -23,8 +23,8 @@ public class SourceTextBuilder : IDisposable
     /// 创建具有指定命名空间的 <see cref="SourceTextBuilder"/> 实例。<br/>
     /// 请务必使用 <see langword="using"/> 语句来确保调用 <see cref="Dispose"/> 方法。
     /// </summary>
-    /// <param name="namespace">命名空间。</param>
-    public SourceTextBuilder(string @namespace)
+    /// <param name="namespace">命名空间。如果传 <see langword="null"/>，表示使用全局命名空间。</param>
+    public SourceTextBuilder(string? @namespace = null)
     {
         Namespace = @namespace;
         _scope = SourceTextBuilderExtensions.BeginBuild(this);
@@ -357,6 +357,7 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
 {
     private readonly List<string> _attributes = [];
     private readonly List<string> _baseTypes = [];
+    private readonly List<string> _typeConstraints = [];
     private readonly List<BracketSourceTextBuilder> _members = [];
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
 
@@ -413,6 +414,34 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 
     /// <summary>
+    /// 为此类型声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attributes">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddAttributes(params ReadOnlySpan<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            _attributes.Add(attribute);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// 为此类型声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attributes">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddAttributes(IEnumerable<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            _attributes.Add(attribute);
+        }
+        return this;
+    }
+
+    /// <summary>
     /// 为此类型声明添加基类或接口。
     /// </summary>
     /// <param name="baseTypes">要添加的基类或接口名称。</param>
@@ -422,6 +451,20 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         foreach (var baseType in baseTypes)
         {
             _baseTypes.Add(baseType);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// 为此类型声明添加类型约束。
+    /// </summary>
+    /// <param name="typeConstraints">要添加的类型约束。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddTypeConstraints(params ReadOnlySpan<string> typeConstraints)
+    {
+        foreach (var typeConstraint in typeConstraints)
+        {
+            _typeConstraints.Add(typeConstraint);
         }
         return this;
     }
@@ -565,6 +608,16 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
             builder.AppendLineWithIndent(attribute, Indent, indentLevel);
         }
         builder.AppendWithIndent(DeclarationLine, Indent, indentLevel);
+        if (_typeConstraints.Count > 0)
+        {
+            for (var i = 0; i < _typeConstraints.Count; i++)
+            {
+                var constraint = _typeConstraints[i];
+                builder.AppendLineWithIndent(
+                    i == _typeConstraints.Count - 1 ? $"{constraint}" : $"{constraint},",
+                    Indent, indentLevel + 1);
+            }
+        }
         if (_baseTypes.Count > 0)
         {
             for (var i = 0; i < _baseTypes.Count; i++)
@@ -693,8 +746,46 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : BracketSourceT
 /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
 public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : CodeBlockSourceTextBuilder(root)
 {
+    private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private readonly List<string> _attributes = [];
+    private readonly List<string> _typeConstraints = [];
     private readonly List<List<BracketSourceTextBuilder>> _statementGroups = [];
+
+    /// <summary>
+    /// 为此方法声明添加文档注释。
+    /// </summary>
+    /// <param name="documentationCommentBuilder">文档注释构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder WithDocumentationComment(Action<DocumentationCommentSourceTextBuilder> documentationCommentBuilder)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        documentationCommentBuilder(_documentationCommentBuilder);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加文档注释（原始字符串，需自行包含 /// 等符号）。
+    /// </summary>
+    /// <param name="documentationComment">要添加的文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder WithRawDocumentationComment(string documentationComment)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        _documentationCommentBuilder.AddRawText(documentationComment);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加 summary 文档注释。
+    /// </summary>
+    /// <param name="summary">要添加的 summary 文档注释。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder WithSummaryComment(string summary)
+    {
+        _documentationCommentBuilder = new DocumentationCommentSourceTextBuilder(Root);
+        _documentationCommentBuilder.AddSummaryComment(summary);
+        return this;
+    }
 
     /// <summary>
     /// 方法签名行（如 "public void MyMethod()"）。
@@ -709,6 +800,48 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     public MethodDeclarationSourceTextBuilder AddAttribute(string attribute)
     {
         _attributes.Add(attribute);
+        return this;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attributes">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder AddAttributes(params ReadOnlySpan<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            _attributes.Add(attribute);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加特性（如 [GeneratedCode(...)]）。
+    /// </summary>
+    /// <param name="attributes">要添加的特性行。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder AddAttributes(IEnumerable<string> attributes)
+    {
+        foreach (var attribute in attributes)
+        {
+            _attributes.Add(attribute);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加类型约束。
+    /// </summary>
+    /// <param name="typeConstraints">要添加的类型约束。</param>
+    /// <returns>辅助链式调用。</returns>
+    public MethodDeclarationSourceTextBuilder AddTypeConstraints(params ReadOnlySpan<string> typeConstraints)
+    {
+        foreach (var typeConstraint in typeConstraints)
+        {
+            _typeConstraints.Add(typeConstraint);
+        }
         return this;
     }
 
@@ -759,12 +892,25 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// <param name="indentLevel">缩进级别。</param>
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
+        if (_documentationCommentBuilder is { } documentationCommentBuilder)
+        {
+            documentationCommentBuilder.BuildInto(builder, indentLevel);
+        }
         foreach (var attribute in _attributes)
         {
             builder.AppendLineWithIndent(attribute, Indent, indentLevel);
         }
         builder.AppendLineWithIndent(Signature, Indent, indentLevel);
-
+        if (_typeConstraints.Count > 0)
+        {
+            for (var i = 0; i < _typeConstraints.Count; i++)
+            {
+                var constraint = _typeConstraints[i];
+                builder.AppendLineWithIndent(
+                    i == _typeConstraints.Count - 1 ? $"{constraint}" : $"{constraint},",
+                    Indent, indentLevel + 1);
+            }
+        }
         using var _ = BracketScope.Begin(builder, Indent, indentLevel);
         base.BuildInto(builder, indentLevel + 1);
     }
