@@ -73,7 +73,7 @@ internal static class GeneratorInfo
     /// </summary>
     /// <param name="builder"></param>
     /// <returns></returns>
-    public static TypeDeclarationSourceTextBuilder AddGeneratedToolAndEditorBrowsingAttributes(this TypeDeclarationSourceTextBuilder builder)
+    public static IAllowAttributes AddGeneratedToolAndEditorBrowsingAttributes(this IAllowAttributes builder)
     {
         return builder
             .AddAttribute("[global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]")
