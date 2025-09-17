@@ -31,6 +31,11 @@ public class SourceTextBuilder : IDisposable
     }
 
     /// <summary>
+    /// 根 <see cref="SourceTextBuilder"/> 实例。
+    /// </summary>
+    public SourceTextBuilder Root => this;
+
+    /// <summary>
     /// 是否使用文件作用域的命名空间。
     /// </summary>
     public bool UseFileScopedNamespace { get; init; } = true;
@@ -120,26 +125,11 @@ public class SourceTextBuilder : IDisposable
     /// <returns>辅助链式调用。</returns>
     public SourceTextBuilder AddRawText(string rawText)
     {
-        var rawDeclaration = new RawSourceTextBuilder(this)
+        var rawDeclaration = new RawSourceTextBuilder(Root)
         {
             RawText = rawText,
         };
         _topLevelCode.Add(rawDeclaration);
-        return this;
-    }
-
-    /// <summary>
-    /// 添加类型声明。
-    /// </summary>
-    /// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
-    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
-    /// <returns>辅助链式调用。</returns>
-    public SourceTextBuilder AddTypeDeclaration(string declarationLine,
-        Action<TypeDeclarationSourceTextBuilder> typeDeclarationBuilder)
-    {
-        var typeDeclaration = new TypeDeclarationSourceTextBuilder(this, declarationLine);
-        typeDeclarationBuilder(typeDeclaration);
-        _topLevelCode.Add(typeDeclaration);
         return this;
     }
 
@@ -152,9 +142,45 @@ public class SourceTextBuilder : IDisposable
     public SourceTextBuilder AddNamespaceDeclaration(string @namespace,
         Action<NamespaceDeclarationSourceTextBuilder> namespaceDeclarationBuilder)
     {
-        var namespaceDeclaration = new NamespaceDeclarationSourceTextBuilder(this, @namespace);
+        var namespaceDeclaration = new NamespaceDeclarationSourceTextBuilder(Root, @namespace);
         namespaceDeclarationBuilder(namespaceDeclaration);
         _topLevelCode.Add(namespaceDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="declarationLine">类型声明行（如 "public class MyClass"）。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public SourceTextBuilder AddTypeDeclaration(string declarationLine,
+        Action<TypeDeclarationSourceTextBuilder> typeDeclarationBuilder)
+    {
+        var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+        typeDeclarationBuilder(typeDeclaration);
+        _topLevelCode.Add(typeDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="items">用于生成多个类型声明的数据源。</param>
+    /// <param name="declarationLineBuilder">类型声明行构建器。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public SourceTextBuilder AddTypeDeclarations<T>(IEnumerable<T> items,
+        Func<T, string> declarationLineBuilder,
+        Action<TypeDeclarationSourceTextBuilder, T> typeDeclarationBuilder)
+    {
+        foreach (var item in items)
+        {
+            var declarationLine = declarationLineBuilder(item);
+            var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+            typeDeclarationBuilder(typeDeclaration, item);
+            _topLevelCode.Add(typeDeclaration);
+        }
         return this;
     }
 
@@ -332,6 +358,27 @@ public class NamespaceDeclarationSourceTextBuilder(SourceTextBuilder root, strin
         var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
         typeDeclarationBuilder(typeDeclaration);
         _typeDeclarations.Add(typeDeclaration);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加类型声明。
+    /// </summary>
+    /// <param name="items">用于生成多个类型声明的数据源。</param>
+    /// <param name="declarationLineBuilder">类型声明行构建器。</param>
+    /// <param name="typeDeclarationBuilder">类型声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public NamespaceDeclarationSourceTextBuilder AddTypeDeclarations<T>(IEnumerable<T> items,
+        Func<T, string> declarationLineBuilder,
+        Action<TypeDeclarationSourceTextBuilder, T> typeDeclarationBuilder)
+    {
+        foreach (var item in items)
+        {
+            var declarationLine = declarationLineBuilder(item);
+            var typeDeclaration = new TypeDeclarationSourceTextBuilder(Root, declarationLine);
+            typeDeclarationBuilder(typeDeclaration, item);
+            _typeDeclarations.Add(typeDeclaration);
+        }
         return this;
     }
 
