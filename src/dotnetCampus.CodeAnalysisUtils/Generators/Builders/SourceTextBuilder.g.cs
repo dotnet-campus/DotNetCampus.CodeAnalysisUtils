@@ -1249,9 +1249,12 @@ file static class Extensions
                 continue;
             }
 
-            builder
-                .AppendIndent(indent, indentLevel)
-                .Append(text, currentLineStart, index - currentLineStart + 1);
+            var isPreprocessorDirective = text[currentLineStart] == '#';
+            if (!isPreprocessorDirective)
+            {
+                builder.AppendIndent(indent, indentLevel);
+            }
+            builder.Append(text, currentLineStart, index - currentLineStart + 1);
             currentLineStart = index + 1;
         }
         return builder;
