@@ -10,7 +10,7 @@ namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 /// 辅助链式生成源代码文本的构建器。
 /// </summary>
 public class SourceTextBuilder : IDisposable,
-    IAllowBracketScopedNamespace, IAllowTypeDeclaration, IAllowStatements
+    IAllowScopedNamespace, IAllowTypeDeclaration, IAllowStatements
 {
     private readonly HashSet<string> _systemUsings = [];
     private readonly HashSet<string> _otherUsings = [];
@@ -352,7 +352,7 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
 public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : IndentSourceTextBuilder(root),
-    IAllowStatements, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
+    IAllowStatements, IAllowMethodDeclaration, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
 {
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private AttributeListSourceTextBuilder? _attributeListBuilder;
@@ -588,23 +588,23 @@ public class DocumentationCommentSourceTextBuilder(SourceTextBuilder root) : Ind
     {
         if (_summary is { } summary)
         {
-            builder.AppendWithIndentAndPrefix(summary, "/// ", Indent, indentLevel);
+            builder.AppendWithIndentAndPrefix(summary, "/// ", Indent, indentLevel).AppendLine();
         }
         foreach (var param in _params)
         {
-            builder.AppendWithIndentAndPrefix(param, "/// ", Indent, indentLevel);
+            builder.AppendWithIndentAndPrefix(param, "/// ", Indent, indentLevel).AppendLine();
         }
         if (_returns is { } returns)
         {
-            builder.AppendWithIndentAndPrefix(returns, "/// ", Indent, indentLevel);
+            builder.AppendWithIndentAndPrefix(returns, "/// ", Indent, indentLevel).AppendLine();
         }
         if (_remarks is { } remarks)
         {
-            builder.AppendWithIndentAndPrefix(remarks, "/// ", Indent, indentLevel);
+            builder.AppendWithIndentAndPrefix(remarks, "/// ", Indent, indentLevel).AppendLine();
         }
         if (_footerRawText is { } footerRawText)
         {
-            builder.AppendWithIndentAndPrefix(footerRawText, "/// ", Indent, indentLevel);
+            builder.AppendWithIndentAndPrefix(footerRawText, "/// ", Indent, indentLevel).AppendLine();
         }
     }
 }

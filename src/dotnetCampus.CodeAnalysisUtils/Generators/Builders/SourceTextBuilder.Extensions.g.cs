@@ -36,7 +36,7 @@ public interface IAllowNestedSourceTextBuilder : ISourceTextBuilder
 /// <summary>
 /// 指示该源代码构建器支持在内部放入「块命名空间」。
 /// </summary>
-public interface IAllowBracketScopedNamespace : IAllowNestedSourceTextBuilder;
+public interface IAllowScopedNamespace : IAllowNestedSourceTextBuilder;
 
 /// <summary>
 /// 指示该源代码构建器支持在内部放入「类型声明」。
@@ -92,9 +92,9 @@ public interface IAllowTypeConstraints
 }
 
 /// <summary>
-/// 提供 <see cref="IAllowBracketScopedNamespace"/> 的扩展方法。
+/// 提供 <see cref="IAllowScopedNamespace"/> 的扩展方法。
 /// </summary>
-public static class AllowBracketScopedNamespaceExtensions
+public static class AllowScopedNamespaceExtensions
 {
     /// <summary>
     /// 添加命名空间声明。
@@ -106,7 +106,7 @@ public static class AllowBracketScopedNamespaceExtensions
     public static TBuilder AddNamespaceDeclaration<TBuilder>(this TBuilder builder,
         string @namespace,
         Action<NamespaceDeclarationSourceTextBuilder> namespaceDeclarationBuilder)
-        where TBuilder : IAllowBracketScopedNamespace
+        where TBuilder : IAllowScopedNamespace
     {
         var namespaceDeclaration = new NamespaceDeclarationSourceTextBuilder(builder.Root, @namespace);
         namespaceDeclarationBuilder(namespaceDeclaration);
@@ -125,7 +125,7 @@ public static class AllowBracketScopedNamespaceExtensions
     public static TBuilder AddNamespaceDeclarations<TBuilder, TItem>(this TBuilder builder, IEnumerable<TItem> items,
         Func<TItem, string> namespaceConverter,
         Action<NamespaceDeclarationSourceTextBuilder, TItem> namespaceDeclarationBuilder)
-        where TBuilder : IAllowBracketScopedNamespace
+        where TBuilder : IAllowScopedNamespace
     {
         foreach (var item in items)
         {
@@ -298,12 +298,31 @@ public static class AllowStatementsExtensions
     }
 
     /// <summary>
+    /// 为此方法声明添加一个原始语句。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="rawText">要添加的原始语句。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddRawStatement<TBuilder>(this TBuilder builder,
+        string rawText)
+        where TBuilder : IAllowStatements
+    {
+        var statement = new RawSourceTextBuilder(builder.Root)
+        {
+            RawText = rawText,
+        };
+        builder.AddNestedSourceCode(statement);
+        return builder;
+    }
+
+    /// <summary>
     /// 为此方法声明添加一组原始语句。
     /// </summary>
     /// <param name="builder">辅助链式调用。</param>
     /// <param name="rawTexts">要添加的原始语句。</param>
     /// <returns>辅助链式调用。</returns>
-    public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder, params ReadOnlySpan<string> rawTexts)
+    public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder,
+        params ReadOnlySpan<string> rawTexts)
         where TBuilder : IAllowStatements
     {
         foreach (var rawText in rawTexts)
@@ -323,7 +342,8 @@ public static class AllowStatementsExtensions
     /// <param name="builder">辅助链式调用。</param>
     /// <param name="rawTexts">要批量添加的原始语句。</param>
     /// <returns>辅助链式调用。</returns>
-    public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder, IEnumerable<string> rawTexts)
+    public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder,
+        IEnumerable<string> rawTexts)
         where TBuilder : IAllowStatements
     {
         foreach (var rawText in rawTexts)
