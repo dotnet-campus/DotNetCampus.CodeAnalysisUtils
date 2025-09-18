@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 
@@ -28,7 +29,12 @@ internal readonly record struct EmbeddedSourceFile(
     {
         var directory = Path.GetDirectoryName(relativePath)!;
         var fileName = Path.GetFileName(relativePath);
-        return EmbeddedSourceFiles.Enumerate(directory)
-            .Single(x => x.FileName == fileName);
+        var file = EmbeddedSourceFiles.Enumerate(directory)
+            .FirstOrDefault(x => x.FileName == fileName);
+        if (file == default)
+        {
+            throw new FileNotFoundException($"未找到嵌入的资源文件：{relativePath}");
+        }
+        return file;
     }
 }
