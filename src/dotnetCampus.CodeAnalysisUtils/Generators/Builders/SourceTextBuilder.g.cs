@@ -439,6 +439,33 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     internal bool WrapWithBracket { get; init; }
 
     /// <summary>
+    /// 代码块的头部文本。如果不为 <see langword="null"/>，则在代码块开始前添加此文本。<br/>
+    /// 适用于构建 if (xxx), _ => xxx switch 等需要在代码块前添加头部文本的场景。
+    /// </summary>
+    /// <remarks>
+    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
+    /// </remarks>
+    internal string? Header { get; init; }
+
+    /// <summary>
+    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
+    /// 适用于构建 => { 等需要在代码块前添加头部文本的场景。
+    /// </summary>
+    /// <remarks>
+    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
+    /// </remarks>
+    internal string StartBracket { get; init; } = "{";
+
+    /// <summary>
+    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
+    /// 适用于 }); 等这种大括号后还有尾部文本的场景。
+    /// </summary>
+    /// <remarks>
+    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
+    /// </remarks>
+    internal string EndBracket { get; init; } = "}";
+
+    /// <summary>
     /// 指示这是否是一个用于分隔上下代码块的空行。<br/>
     /// 如果是，则在生成代码时会在此代码块前后各添加一个空行。
     /// </summary>
@@ -474,7 +501,16 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
 
             if (statement is CodeBlockSourceTextBuilder { WrapWithBracket: true } codeBlock)
             {
-                using var c = BracketScope.Begin(builder, Indent, indentLevel);
+                if (codeBlock.Header is { } header)
+                {
+                    builder.AppendLineWithIndent(header, Indent, indentLevel);
+                }
+
+                using var c = new BracketScope(builder, Indent, indentLevel)
+                {
+                    StartBracket = codeBlock.StartBracket,
+                    EndBracket = codeBlock.EndBracket,
+                };
                 codeBlock.BuildInto(builder, indentLevel + 1);
             }
             else
@@ -691,6 +727,9 @@ file class BracketScope : IDisposable
     private readonly string _indent;
     private readonly int _indentLevel;
 
+    public string StartBracket { get; init; } = "{";
+    public string EndBracket { get; init; } = "}";
+
     public BracketScope(StringBuilder builder, string indent, int indentLevel)
     {
         _builder = builder;
@@ -700,7 +739,7 @@ file class BracketScope : IDisposable
         {
             _builder.Append(_indent);
         }
-        _builder.AppendLine("{");
+        _builder.AppendLine(StartBracket);
     }
 
     public void Dispose()
@@ -709,7 +748,7 @@ file class BracketScope : IDisposable
         {
             _builder.Append(_indent);
         }
-        _builder.AppendLine("}");
+        _builder.AppendLine(EndBracket);
     }
 
     public static IDisposable Begin(StringBuilder builder, string indent, int indentLevel)
@@ -779,7 +818,7 @@ file static class Extensions
             _ = (line.Length is 0, !string.IsNullOrEmpty(prefix), isPreprocessorDirective) switch
             {
                 // 空行
-                (true, _, _) => builder,
+                (true, _, _) => builder.AppendLine(),
                 // 有前缀（如注释）
                 (_, true, _) => builder.AppendIndent(indent, indentLevel).Append(prefix).Append(text, currentLineStart, index - currentLineStart + 1),
                 // 是预处理指令

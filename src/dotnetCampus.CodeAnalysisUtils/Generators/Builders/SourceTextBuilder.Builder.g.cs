@@ -361,24 +361,36 @@ public static class AllowStatementsExtensions
     /// <param name="builder">辅助链式调用。</param>
     /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
     /// <param name="codeBlockBuilder">代码块构建器。</param>
-    /// <returns></returns>
+    /// <returns>辅助链式调用。</returns>
     public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
         string? header,
         Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
         where TBuilder : IAllowStatements
     {
-        if (header is not null)
-        {
-            var statement = new RawSourceTextBuilder(builder.Root)
-            {
-                RawText = header,
-            };
-            builder.AddNestedSourceCode(statement);
-        }
+        builder.AddBracketScope(header, "{", "}", codeBlockBuilder);
+        return builder;
+    }
 
+    /// <summary>
+    /// 添加一个大括号作用域代码块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
+    /// <param name="startBracket">自定义起始括号。适用于有多层括号时的场景。</param>
+    /// <param name="endBracket">自定义结束括号。适用于有多层括号时的场景。</param>
+    /// <param name="codeBlockBuilder">代码块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
+        string? header, string startBracket, string endBracket,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
+        where TBuilder : IAllowStatements
+    {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
             WrapWithBracket = true,
+            Header = header,
+            StartBracket = startBracket,
+            EndBracket = endBracket,
         };
         codeBlockBuilder(codeBlock);
         builder.AddNestedSourceCode(codeBlock);
