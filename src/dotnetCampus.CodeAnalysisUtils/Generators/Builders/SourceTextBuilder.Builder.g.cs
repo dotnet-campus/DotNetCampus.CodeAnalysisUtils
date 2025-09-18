@@ -278,22 +278,20 @@ public static class AllowMemberDeclarationExtensions
 public static class AllowStatementsExtensions
 {
     /// <summary>
-    /// 为此方法声明添加一个空行。
+    /// 添加一个空行以分隔上下代码块。
     /// </summary>
     /// <param name="builder">辅助链式调用。</param>
-    /// <param name="count">要添加的空行数。</param>
+    /// <param name="force">
+    /// 是否强制添加空行，即使这是第一个或最后一个语句。默认为 <see langword="false"/>。
+    /// </param>
     /// <returns>辅助链式调用。</returns>
-    public static TBuilder AddEmptyLine<TBuilder>(this TBuilder builder, int count = 1)
+    public static TBuilder AddLineSeparator<TBuilder>(this TBuilder builder, bool force = false)
         where TBuilder : IAllowStatements
     {
-        for (int i = 0; i < count; i++)
+        builder.AddNestedSourceCode(new CodeBlockSourceTextBuilder(builder.Root)
         {
-            var line = new RawSourceTextBuilder(builder.Root)
-            {
-                RawText = "",
-            };
-            builder.AddNestedSourceCode(line);
-        }
+            IsLineSeparator = true,
+        });
         return builder;
     }
 
@@ -378,7 +376,10 @@ public static class AllowStatementsExtensions
             builder.AddNestedSourceCode(statement);
         }
 
-        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root, true);
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+            WrapWithBracket = true,
+        };
         codeBlockBuilder(codeBlock);
         builder.AddNestedSourceCode(codeBlock);
         return builder;

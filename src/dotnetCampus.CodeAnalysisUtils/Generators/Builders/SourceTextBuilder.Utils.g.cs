@@ -64,7 +64,6 @@ public sealed class ConditionSourceTextBuilder<TBuilder>(TBuilder builder)
     /// </summary>
     /// <param name="condition">条件。</param>
     /// <param name="action">链式调用源代码构建器。</param>
-    /// <typeparam name="TBuilder">原始的源代码构建器。</typeparam>
     /// <returns>带有条件判断的源代码构建器。</returns>
     public ConditionSourceTextBuilder<TBuilder> Condition(bool condition, Action<TBuilder> action)
     {

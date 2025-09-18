@@ -16,7 +16,7 @@ public class SourceTextBuilder : IDisposable,
     private readonly HashSet<string> _otherUsings = [];
     private readonly HashSet<string> _staticUsings = [];
     private readonly HashSet<string> _aliasUsings = [];
-    private readonly List<IndentSourceTextBuilder> _topLevelCode = [];
+    private readonly List<IndentSourceTextBuilder> _topLevelCodes = [];
     private readonly IDisposable _scope;
 
     /// <summary>
@@ -120,7 +120,7 @@ public class SourceTextBuilder : IDisposable,
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
-    void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) => _topLevelCode.Add(memberBuilder);
+    void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) => _topLevelCodes.Add(memberBuilder);
 
     /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
     public SourceTextBuilder AddRawText(string rawText)
@@ -129,7 +129,7 @@ public class SourceTextBuilder : IDisposable,
         {
             RawText = rawText,
         };
-        _topLevelCode.Add(rawDeclaration);
+        _topLevelCodes.Add(rawDeclaration);
         return this;
     }
 
@@ -198,14 +198,32 @@ public class SourceTextBuilder : IDisposable,
         var typeIndentLevel = UseFileScopedNamespace ? 0 : indentLevel + 1;
 
         // types
-        for (var i = 0; i < _topLevelCode.Count; i++)
+        for (var i = 0; i < _topLevelCodes.Count; i++)
         {
             if (i > 0)
             {
                 builder.AppendLine();
             }
 
-            _topLevelCode[i].BuildInto(builder, typeIndentLevel);
+            var topLevelCode = _topLevelCodes[i];
+            if (topLevelCode is CodeBlockSourceTextBuilder codeBlock)
+            {
+                // 顶级语句。
+                var isLineSeparator = codeBlock.IsLineSeparator && i > 0 && i < _topLevelCodes.Count - 1;
+                if (isLineSeparator)
+                {
+                    builder.AppendLine();
+                }
+                else
+                {
+                    topLevelCode.BuildInto(builder, typeIndentLevel);
+                }
+            }
+            else
+            {
+                // 类型声明。
+                topLevelCode.BuildInto(builder, typeIndentLevel);
+            }
         }
 
         // 统一化换行符
@@ -357,7 +375,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private AttributeListSourceTextBuilder? _attributeListBuilder;
     private TypeConstraintsSourceTextBuilder? _typeConstraintBuilder;
-    private readonly List<IndentSourceTextBuilder> _statements = [];
+    private readonly CodeBlockSourceTextBuilder _methodBody = new CodeBlockSourceTextBuilder(root);
 
     DocumentationCommentSourceTextBuilder IAllowDocumentationComment.DocumentationCommentBuilder =>
         _documentationCommentBuilder ??= new DocumentationCommentSourceTextBuilder(Root);
@@ -375,16 +393,13 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
-    void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) => _statements.Add(memberBuilder);
+    void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) =>
+        ((IAllowNestedSourceTextBuilder)_methodBody).AddNestedSourceCode(memberBuilder);
 
     /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
-    MethodDeclarationSourceTextBuilder AddRawText(string rawText)
+    public MethodDeclarationSourceTextBuilder AddRawText(string rawText)
     {
-        var statement = new RawSourceTextBuilder(Root)
-        {
-            RawText = rawText,
-        };
-        _statements.Add(statement);
+        _methodBody.AddRawText(rawText);
         return this;
     }
 
@@ -405,19 +420,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
             typeConstraintBuilder.BuildInto(builder, indentLevel + 1);
         }
         using var _ = BracketScope.Begin(builder, Indent, indentLevel);
-        var methodBodyIndentLevel = indentLevel + 1;
-        foreach (var statement in _statements)
-        {
-            if (statement is CodeBlockSourceTextBuilder { WrapWithBracket: true } codeBlock)
-            {
-                using var c = BracketScope.Begin(builder, Indent, methodBodyIndentLevel);
-                codeBlock.BuildInto(builder, methodBodyIndentLevel + 1);
-            }
-            else
-            {
-                statement.BuildInto(builder, methodBodyIndentLevel);
-            }
-        }
+        _methodBody.BuildInto(builder, indentLevel + 1);
     }
 }
 
@@ -425,8 +428,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
 /// 代码块源代码文本构建器。
 /// </summary>
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
-/// <param name="wrapWithBracket">是否使用大括号包裹代码块。</param>
-public class CodeBlockSourceTextBuilder(SourceTextBuilder root, bool wrapWithBracket) : IndentSourceTextBuilder(root),
+public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuilder(root),
     IAllowStatements
 {
     private readonly List<IndentSourceTextBuilder> _statements = [];
@@ -434,14 +436,20 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root, bool wrapWithBra
     /// <summary>
     /// 是否使用大括号包裹代码块。
     /// </summary>
-    internal bool WrapWithBracket => wrapWithBracket;
+    internal bool WrapWithBracket { get; init; }
+
+    /// <summary>
+    /// 指示这是否是一个用于分隔上下代码块的空行。<br/>
+    /// 如果是，则在生成代码时会在此代码块前后各添加一个空行。
+    /// </summary>
+    internal bool IsLineSeparator { get; init; }
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
     void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) => _statements.Add(memberBuilder);
 
     /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
-    CodeBlockSourceTextBuilder AddRawText(string rawText)
+    public CodeBlockSourceTextBuilder AddRawText(string rawText)
     {
         var statement = new RawSourceTextBuilder(Root)
         {
@@ -454,11 +462,19 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root, bool wrapWithBra
     /// <inheritdoc />
     public override void BuildInto(StringBuilder builder, int indentLevel)
     {
-        foreach (var statement in _statements)
+        for (var i = 0; i < _statements.Count; i++)
         {
+            var statement = _statements[i];
+            var isLineSeparator = statement is CodeBlockSourceTextBuilder { IsLineSeparator: true } && i > 0 && i < _statements.Count - 1;
+            if (isLineSeparator)
+            {
+                builder.AppendLine();
+                continue;
+            }
+
             if (statement is CodeBlockSourceTextBuilder { WrapWithBracket: true } codeBlock)
             {
-                using var _ = BracketScope.Begin(builder, Indent, indentLevel);
+                using var c = BracketScope.Begin(builder, Indent, indentLevel);
                 codeBlock.BuildInto(builder, indentLevel + 1);
             }
             else
@@ -758,19 +774,19 @@ file static class Extensions
                 continue;
             }
 
-            var isPreprocessorDirective = text[currentLineStart] == '#';
-            if (string.IsNullOrEmpty(prefix))
+            var line = text.AsSpan(currentLineStart, index - currentLineStart + 1).Trim();
+            var isPreprocessorDirective = line.Length > 0 && line[0] == '#';
+            _ = (line.Length is 0, !string.IsNullOrEmpty(prefix), isPreprocessorDirective) switch
             {
-                if (!isPreprocessorDirective)
-                {
-                    builder.AppendIndent(indent, indentLevel);
-                }
-            }
-            else
-            {
-                builder.AppendIndent(indent, indentLevel).Append(prefix);
-            }
-            builder.Append(text, currentLineStart, index - currentLineStart + 1);
+                // 空行
+                (true, _, _) => builder,
+                // 有前缀（如注释）
+                (_, true, _) => builder.AppendIndent(indent, indentLevel).Append(prefix).Append(text, currentLineStart, index - currentLineStart + 1),
+                // 是预处理指令
+                (_, _, true) => builder.Append(text, currentLineStart, index - currentLineStart + 1),
+                // 是普通代码行
+                _ => builder.AppendIndent(indent, indentLevel).Append(text, currentLineStart, index - currentLineStart + 1),
+            };
             currentLineStart = index + 1;
         }
         return builder;
