@@ -55,6 +55,11 @@ public abstract class IndentSourceTextBuilder(SourceTextBuilder root)
 public sealed class ConditionSourceTextBuilder<TBuilder>(TBuilder builder)
 {
     /// <summary>
+    /// 是否有条件已经满足。
+    /// </summary>
+    private bool _conditionMet = false;
+
+    /// <summary>
     /// 根据 <paramref name="condition"/> 的值决定是否执行 <paramref name="action"/> 中的代码。
     /// </summary>
     /// <param name="condition">条件。</param>
@@ -63,8 +68,9 @@ public sealed class ConditionSourceTextBuilder<TBuilder>(TBuilder builder)
     /// <returns>带有条件判断的源代码构建器。</returns>
     public ConditionSourceTextBuilder<TBuilder> Condition(bool condition, Action<TBuilder> action)
     {
-        if (condition)
+        if (!_conditionMet && condition)
         {
+            _conditionMet = true;
             action(builder);
         }
         return this;
@@ -77,7 +83,10 @@ public sealed class ConditionSourceTextBuilder<TBuilder>(TBuilder builder)
     /// <returns>带有条件判断的源代码构建器。</returns>
     public ConditionSourceTextBuilder<TBuilder> Otherwise(Action<TBuilder> action)
     {
-        action(builder);
+        if (!_conditionMet)
+        {
+            action(builder);
+        }
         return this;
     }
 
