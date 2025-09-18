@@ -92,6 +92,23 @@ public interface IAllowTypeConstraints
 }
 
 /// <summary>
+/// 提供 <see cref="SourceTextBuilder"/> 的扩展方法。
+/// </summary>
+public static class SourceTextBuilderBaseExtensions
+{
+    /// <summary>
+    /// 当在某个源代码构建器的参数中不需要做任何事情时，调用此方法以保持链式调用的完整性。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder Ignore<TBuilder>(this TBuilder builder)
+        where TBuilder : ISourceTextBuilder
+    {
+        return builder;
+    }
+}
+
+/// <summary>
 /// 提供 <see cref="IAllowScopedNamespace"/> 的扩展方法。
 /// </summary>
 public static class AllowScopedNamespaceExtensions
