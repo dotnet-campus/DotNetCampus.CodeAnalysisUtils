@@ -26,5 +26,5 @@ jobs:
 
     - name: Push generated package to NuGet
       run: |
-        dotnet nuget push .\bin\Release\*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.NugetKey }}
-        dotnet nuget push .\bin\Release\*.nupkg -s https://nuget.pkg.github.com/${{ github.repository_owner }} --api-key ${{ secrets.GITHUB_TOKEN }} --timeout 3000
+        dotnet nuget push .\artifacts\package\release\*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.NugetKey }}
+        dotnet nuget push .\artifacts\package\release\*.nupkg -s https://nuget.pkg.github.com/${{ github.repository_owner }} --api-key ${{ secrets.GITHUB_TOKEN }} --timeout 3000
