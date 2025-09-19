@@ -1,0 +1,45 @@
+<Project>
+
+  <!-- 这里是 DotNetCampus.CodeAnalysisUtils 库的打包版本号 -->
+  <Import Project="build\Version.props" />
+
+  <!-- 框架和语言信息 -->
+  <PropertyGroup>
+    <!-- 语言 -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <!-- 构建 -->
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts\</ArtifactsPath>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!--
+      Adding NoWarn to remove build warnings
+      NU1507: Warning when there are multiple package sources when using CPM with no source mapping
+      NU5128: 在 nuspec 和 lib/ref 文件夹的依赖项组中声明的某些目标框架在其他位置没有完全匹配项。请参阅以下操作列表:
+              -为以下组件添加库或引用程序集 netstandard2.0 目标框架
+    -->
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+    <!--
+      CA1416: 平台兼容性警告
+    -->
+    <WarningsAsErrors>$(WarningAsErrors);CA1416</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- 自定义属性 -->
+  <PropertyGroup>
+    <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    <ThisYear>$([System.DateTime]::Now.ToString(`yyyy`))</ThisYear>
+  </PropertyGroup>
+
+  <!--库信息 -->
+  <PropertyGroup>
+    <Description>为 DotNetCampus 组织下项目内附带的源分析器/源生成器提供公共方法。</Description>
+    <Authors>dotnet-campus</Authors>
+    <Company>dotnet campus（.NET 职业技术学院）</Company>
+    <Copyright>Copyright &#169; 2024-$(ThisYear) dotnet campus, All Rights Reserved.</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/dotnet-campus/DotNetCampus.CodeAnalysisUtils</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dotnet-campus/DotNetCampus.CodeAnalysisUtils</PackageProjectUrl>
+  </PropertyGroup>
+
+</Project>

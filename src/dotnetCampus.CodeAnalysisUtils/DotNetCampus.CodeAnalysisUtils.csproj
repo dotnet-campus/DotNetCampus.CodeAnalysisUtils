@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>false</ImplicitUsings>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <RootNamespace>DotNetCampus.CodeAnalysis.Utils</RootNamespace>
+    <PackageId>DotNetCampus.CodeAnalysisUtils</PackageId>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetCampus.LatestCSharpFeatures" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.g.cs" LinkBase="." />
+  </ItemGroup>
+
+  <Target Name="_IncludeAllDependencies" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="Package\_._" Pack="true" PackagePath="lib\netstandard2.0\" />
+      <None Include="$(RepositoryRoot)README.md" Pack="true" PackagePath="\" />
+      <None Include="$(ArtifactsPath)bin\DotNetCampus.CodeAnalysisUtils\$(Configuration)\**\*.dll" Pack="true" PackagePath="analyzers\dotnet\cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>
