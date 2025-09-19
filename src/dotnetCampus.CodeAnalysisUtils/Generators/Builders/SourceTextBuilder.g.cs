@@ -48,7 +48,7 @@ public class SourceTextBuilder : IDisposable,
     /// <summary>
     /// 缩进字符串。默认为四个空格（"    "）。
     /// </summary>
-    public string Indent { get; init; } = "    ";
+    public string Indentation { get; init; } = "    ";
 
     /// <summary>
     /// 源代码中每一行的换行符。默认为换行符（"\n"）。
@@ -148,13 +148,18 @@ public class SourceTextBuilder : IDisposable,
     /// <returns>生成的源代码文本。</returns>
     public override string ToString()
     {
-        var builder = new StringBuilder();
-        BuildInto(builder, 0);
+        var builder = new IndentedStringBuilder
+        {
+            Indentation = Indentation,
+            NewLine = NewLine,
+            LineProcessor = IndentLineProcessors.CSharp,
+        };
+        BuildInto(builder);
         return builder.ToString();
     }
 
-    /// <inheritdoc cref="IndentSourceTextBuilder.BuildInto(StringBuilder, int)" />
-    public void BuildInto(StringBuilder builder, int indentLevel)
+    /// <inheritdoc cref="IndentSourceTextBuilder.BuildInto(IndentedStringBuilder)" />
+    private void BuildInto(IndentedStringBuilder builder)
     {
         builder.AppendLine("#nullable enable");
 
@@ -185,17 +190,17 @@ public class SourceTextBuilder : IDisposable,
         {
             if (UseFileScopedNamespace)
             {
-                builder.AppendLine($"namespace {Namespace};").AppendLine();
+                builder.AppendLine($"namespace {@namespace};");
+                builder.AppendLine();
             }
             else
             {
-                builder.AppendLine($"namespace {Namespace}");
+                builder.AppendLine($"namespace {@namespace}");
             }
         }
         using var _ = UseFileScopedNamespace || Namespace is null
-            ? EmptyScope.Begin()
-            : BracketScope.Begin(builder, Indent, indentLevel);
-        var typeIndentLevel = UseFileScopedNamespace ? 0 : indentLevel + 1;
+            ? new BracketScope(builder, 0, null, null)
+            : new BracketScope(builder);
 
         // types
         for (var i = 0; i < _topLevelCodes.Count; i++)
@@ -216,24 +221,21 @@ public class SourceTextBuilder : IDisposable,
                 }
                 else
                 {
-                    topLevelCode.BuildInto(builder, typeIndentLevel);
+                    topLevelCode.BuildInto(builder);
                 }
             }
             else
             {
                 // 类型声明。
-                topLevelCode.BuildInto(builder, typeIndentLevel);
+                topLevelCode.BuildInto(builder);
             }
         }
 
         // 统一化换行符
-        builder.Replace("\r", "");
+        // writer.Replace("\r", "");
 
         // 确保最后有且仅有一个换行符
-        while (builder.Length > 0 && char.IsWhiteSpace(builder[^1]))
-        {
-            builder.Length--;
-        }
+        builder.TrimEnd();
         if (AppendNewLineAtEnd)
         {
             builder.AppendLine();
@@ -268,11 +270,13 @@ public class NamespaceDeclarationSourceTextBuilder(SourceTextBuilder root, strin
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         builder.Append("namespace ").AppendLine(_namespace);
-        using var _ = BracketScope.Begin(builder, Indent, indentLevel);
-        BuildMembersInto(builder, indentLevel + 1, _typeDeclarations);
+        using (new BracketScope(builder))
+        {
+            BuildMembersInto(builder, _typeDeclarations);
+        }
     }
 }
 
@@ -334,20 +338,23 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         if (_documentationCommentBuilder is { } documentationCommentBuilder)
         {
-            documentationCommentBuilder.BuildInto(builder, indentLevel);
+            documentationCommentBuilder.BuildInto(builder);
         }
         if (_attributeListBuilder is { } attributeListBuilder)
         {
-            attributeListBuilder.BuildInto(builder, indentLevel);
+            attributeListBuilder.BuildInto(builder);
         }
-        builder.AppendWithIndent(DeclarationLine, Indent, indentLevel);
+        builder.Append(DeclarationLine);
         if (_typeConstraintBuilder is { } typeConstraintBuilder)
         {
-            typeConstraintBuilder.BuildInto(builder, indentLevel + 1);
+            using (builder.IndentIn())
+            {
+                typeConstraintBuilder.BuildInto(builder);
+            }
         }
         if (_baseTypes.Count > 0)
         {
@@ -359,8 +366,10 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         }
         builder.AppendLine();
 
-        using var _ = BracketScope.Begin(builder, Indent, indentLevel);
-        BuildMembersInto(builder, indentLevel + 1, _members);
+        using (new BracketScope(builder))
+        {
+            BuildMembersInto(builder, _members);
+        }
     }
 }
 
@@ -404,23 +413,28 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         if (_documentationCommentBuilder is { } documentationCommentBuilder)
         {
-            documentationCommentBuilder.BuildInto(builder, indentLevel);
+            documentationCommentBuilder.BuildInto(builder);
         }
         if (_attributeListBuilder is { } attributeListBuilder)
         {
-            attributeListBuilder.BuildInto(builder, indentLevel);
+            attributeListBuilder.BuildInto(builder);
         }
-        builder.AppendLineWithIndent(Signature, Indent, indentLevel);
+        builder.AppendLine(Signature);
         if (_typeConstraintBuilder is { } typeConstraintBuilder)
         {
-            typeConstraintBuilder.BuildInto(builder, indentLevel + 1);
+            using (builder.IndentIn())
+            {
+                typeConstraintBuilder.BuildInto(builder);
+            }
         }
-        using var _ = BracketScope.Begin(builder, Indent, indentLevel);
-        _methodBody.BuildInto(builder, indentLevel + 1);
+        using (new BracketScope(builder))
+        {
+            _methodBody.BuildInto(builder);
+        }
     }
 }
 
@@ -487,7 +501,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         for (var i = 0; i < _statements.Count; i++)
         {
@@ -503,19 +517,17 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
             {
                 if (codeBlock.Header is { } header)
                 {
-                    builder.AppendLineWithIndent(header, Indent, indentLevel);
+                    builder.AppendLine(header);
                 }
 
-                using var c = new BracketScope(builder, Indent, indentLevel)
+                using (new BracketScope(builder, 1, codeBlock.StartBracket, codeBlock.EndBracket))
                 {
-                    StartBracket = codeBlock.StartBracket,
-                    EndBracket = codeBlock.EndBracket,
-                };
-                codeBlock.BuildInto(builder, indentLevel + 1);
+                    codeBlock.BuildInto(builder);
+                }
             }
             else
             {
-                statement.BuildInto(builder, indentLevel);
+                statement.BuildInto(builder);
             }
         }
     }
@@ -530,12 +542,12 @@ public class RawSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuil
     /// <summary>
     /// 要添加的原始文本块。
     /// </summary>
-    public required string RawText { get; set; }
+    public required string RawText { get; init; }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
-        builder.AppendLineWithIndent(RawText, Indent, indentLevel);
+        builder.AppendLine(RawText);
     }
 }
 
@@ -636,27 +648,48 @@ public class DocumentationCommentSourceTextBuilder(SourceTextBuilder root) : Ind
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         if (_summary is { } summary)
         {
-            builder.AppendWithIndentAndPrefix(summary, "/// ", Indent, indentLevel).AppendLine();
+            AppendLineWithPrefix(builder, summary, "/// ");
         }
         foreach (var param in _params)
         {
-            builder.AppendWithIndentAndPrefix(param, "/// ", Indent, indentLevel).AppendLine();
+            AppendLineWithPrefix(builder, param, "/// ");
         }
         if (_returns is { } returns)
         {
-            builder.AppendWithIndentAndPrefix(returns, "/// ", Indent, indentLevel).AppendLine();
+            AppendLineWithPrefix(builder, returns, "/// ");
         }
         if (_remarks is { } remarks)
         {
-            builder.AppendWithIndentAndPrefix(remarks, "/// ", Indent, indentLevel).AppendLine();
+            AppendLineWithPrefix(builder, remarks, "/// ");
         }
         if (_footerRawText is { } footerRawText)
         {
-            builder.AppendWithIndentAndPrefix(footerRawText, "/// ", Indent, indentLevel).AppendLine();
+            AppendLineWithPrefix(builder, footerRawText, "/// ");
+        }
+    }
+
+    private void AppendLineWithPrefix(IndentedStringBuilder builder, string text, string prefix)
+    {
+        var leftPart = text.AsSpan();
+        while (leftPart.Length > 0)
+        {
+            var newLineIndex = leftPart.IndexOf('\n');
+            if (newLineIndex < 0)
+            {
+                // 剩余部分已经没有换行符了，直接写入。
+                builder.Append(prefix).AppendLine(leftPart);
+                return;
+            }
+
+            // 提取当前行，提取后续部分继续循环处理。
+            var line = leftPart[..newLineIndex].TrimEnd('\r');
+            leftPart = leftPart[(newLineIndex + 1)..];
+
+            builder.Append(prefix).AppendLine(line);
         }
     }
 }
@@ -677,11 +710,11 @@ public class AttributeListSourceTextBuilder(SourceTextBuilder root) : IndentSour
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
         foreach (var attribute in _attributes)
         {
-            builder.AppendLineWithIndent($"{attribute}", Indent, indentLevel);
+            builder.AppendLine($"{attribute}");
         }
     }
 }
@@ -706,14 +739,13 @@ public class TypeConstraintsSourceTextBuilder(SourceTextBuilder root) : IndentSo
     }
 
     /// <inheritdoc />
-    public override void BuildInto(StringBuilder builder, int indentLevel)
+    public override void BuildInto(IndentedStringBuilder builder)
     {
+        using var _ = builder.IndentIn();
         for (var i = 0; i < _typeConstraints.Count; i++)
         {
             var constraint = _typeConstraints[i];
-            builder.AppendLineWithIndent(
-                i == _typeConstraints.Count - 1 ? $"{constraint}" : $"{constraint},",
-                Indent, indentLevel + 1);
+            builder.AppendLine(i == _typeConstraints.Count - 1 ? $"{constraint}" : $"{constraint},");
         }
     }
 }
@@ -721,54 +753,30 @@ public class TypeConstraintsSourceTextBuilder(SourceTextBuilder root) : IndentSo
 /// <summary>
 /// 可自动添加大括号作用域的辅助类。
 /// </summary>
-file class BracketScope : IDisposable
+file readonly ref struct BracketScope : IDisposable
 {
-    private readonly StringBuilder _builder;
-    private readonly string _indent;
-    private readonly int _indentLevel;
+    private readonly IndentedStringBuilder _builder;
+    private readonly IndentedStringBuilder.IndentScope _indentScope;
+    private readonly string? _endBracket;
 
-    public string StartBracket { get; init; } = "{";
-    public string EndBracket { get; init; } = "}";
-
-    public BracketScope(StringBuilder builder, string indent, int indentLevel)
+    public BracketScope(IndentedStringBuilder builder, int levels = 1, string? startBracket = "{", string? endBracket = "}")
     {
         _builder = builder;
-        _indent = indent;
-        _indentLevel = indentLevel;
-        for (var i = 0; i < _indentLevel; i++)
+        if (startBracket is not null)
         {
-            _builder.Append(_indent);
+            _builder.AppendLine(startBracket);
         }
-        _builder.AppendLine(StartBracket);
+        _endBracket = endBracket;
+        _indentScope = builder.IndentIn(levels);
     }
 
     public void Dispose()
     {
-        for (var i = 0; i < _indentLevel; i++)
+        _indentScope.Dispose();
+        if (_endBracket is { } bracket)
         {
-            _builder.Append(_indent);
+            _builder.AppendLine(bracket);
         }
-        _builder.AppendLine(EndBracket);
-    }
-
-    public static IDisposable Begin(StringBuilder builder, string indent, int indentLevel)
-    {
-        return new BracketScope(builder, indent, indentLevel);
-    }
-}
-
-/// <summary>
-/// 空作用域辅助类（什么都不做）。这是为了能与 <see cref="BracketScope"/> 统一使用方式。
-/// </summary>
-file class EmptyScope : IDisposable
-{
-    public void Dispose()
-    {
-    }
-
-    public static IDisposable Begin()
-    {
-        return new EmptyScope();
     }
 }
 
@@ -783,51 +791,4 @@ file static class Extensions
         // 保持不变
         null => name,
     };
-
-    internal static StringBuilder AppendIndent(this StringBuilder builder, string indent, int indentLevel)
-    {
-        for (var indentIndex = 0; indentIndex < indentLevel; indentIndex++)
-        {
-            builder.Append(indent);
-        }
-        return builder;
-    }
-
-    internal static StringBuilder AppendWithIndent(this StringBuilder builder, string text, string indent, int indentLevel)
-    {
-        return AppendWithIndentAndPrefix(builder, text, "", indent, indentLevel);
-    }
-
-    internal static StringBuilder AppendLineWithIndent(this StringBuilder builder, string text, string indent, int indentLevel)
-    {
-        return AppendWithIndent(builder, text, indent, indentLevel).AppendLine();
-    }
-
-    internal static StringBuilder AppendWithIndentAndPrefix(this StringBuilder builder, string text, string prefix, string indent, int indentLevel)
-    {
-        var currentLineStart = 0;
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (text[index] != '\n' && index != text.Length - 1)
-            {
-                continue;
-            }
-
-            var line = text.AsSpan(currentLineStart, index - currentLineStart + 1).Trim();
-            var isPreprocessorDirective = line.Length > 0 && line[0] == '#';
-            _ = (line.Length is 0, !string.IsNullOrEmpty(prefix), isPreprocessorDirective) switch
-            {
-                // 空行
-                (true, _, _) => builder.AppendLine(),
-                // 有前缀（如注释）
-                (_, true, _) => builder.AppendIndent(indent, indentLevel).Append(prefix).Append(text, currentLineStart, index - currentLineStart + 1),
-                // 是预处理指令
-                (_, _, true) => builder.Append(text, currentLineStart, index - currentLineStart + 1),
-                // 是普通代码行
-                _ => builder.AppendIndent(indent, indentLevel).Append(text, currentLineStart, index - currentLineStart + 1),
-            };
-            currentLineStart = index + 1;
-        }
-        return builder;
-    }
 }

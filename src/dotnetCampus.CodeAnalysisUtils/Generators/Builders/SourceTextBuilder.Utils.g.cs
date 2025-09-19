@@ -19,22 +19,20 @@ public abstract class IndentSourceTextBuilder(SourceTextBuilder root)
     /// <summary>
     /// 获取缩进字符串。
     /// </summary>
-    public string Indent => root.Indent;
+    public string Indent => root.Indentation;
 
     /// <summary>
     /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
     /// </summary>
     /// <param name="builder">源代码文本将被写入到此实例中。</param>
-    /// <param name="indentLevel">缩进级别。</param>
-    public abstract void BuildInto(StringBuilder builder, int indentLevel);
+    public abstract void BuildInto(IndentedStringBuilder builder);
 
     /// <summary>
     /// 将成员列表生成到指定的 <see cref="StringBuilder"/> 实例中。
     /// </summary>
     /// <param name="builder">源代码文本将被写入到此实例中。</param>
-    /// <param name="indentLevel">缩进级别。</param>
     /// <param name="members">要生成的成员列表。</param>
-    protected void BuildMembersInto(StringBuilder builder, int indentLevel, IReadOnlyList<IndentSourceTextBuilder> members)
+    protected void BuildMembersInto(IndentedStringBuilder builder, IReadOnlyList<IndentSourceTextBuilder> members)
     {
         for (var i = 0; i < members.Count; i++)
         {
@@ -43,7 +41,7 @@ public abstract class IndentSourceTextBuilder(SourceTextBuilder root)
                 builder.AppendLine();
             }
 
-            members[i].BuildInto(builder, indentLevel);
+            members[i].BuildInto(builder);
         }
     }
 }
