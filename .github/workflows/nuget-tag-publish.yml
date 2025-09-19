@@ -22,7 +22,7 @@ jobs:
     - name: Build with dotnet
       run: |
         dotnet build --configuration release
-        dotnet pack --configuration release --no-build
+        dotnet pack --configuration release --no-build src\dotnetCampus.CodeAnalysisUtils\DotNetCampus.CodeAnalysisUtils.csproj
 
     - name: Push generated package to NuGet
       run: |
