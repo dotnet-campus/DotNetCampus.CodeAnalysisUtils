@@ -11,6 +11,7 @@ public class IndentedStringBuilder
 {
     private readonly StringBuilder _builder = new StringBuilder();
     private readonly StringBuilder _lineBuffer = new StringBuilder();
+    private IndentLineProcessorHandler? _tempProcessor;
 
     /// <summary>
     /// 获取缩进字符串。
@@ -54,11 +55,75 @@ public class IndentedStringBuilder
     public IndentedStringBuilder Append(string text) => AppendCore(text.AsSpan(), false);
 
     /// <summary>
+    /// 添加文本，不添加换行符。使用指定的行处理器处理本次添加的文本。
+    /// </summary>
+    /// <param name="text">要写入的文本。</param>
+    /// <param name="lineProcessor">
+    /// 用于处理行的行处理器。<br/>
+    /// 如果想临时禁用全局设置的行处理器，可传入 <see cref="IndentLineProcessors.Default"/>。
+    /// </param>
+    /// <returns>辅助链式调用。</returns>
+    public IndentedStringBuilder Append(string text, IndentLineProcessorHandler lineProcessor)
+    {
+        _tempProcessor = lineProcessor;
+        try
+        {
+            return Append(text);
+        }
+        finally
+        {
+            _tempProcessor = null;
+        }
+    }
+
+    /// <summary>
     /// 添加文本，不添加换行符。
     /// </summary>
     /// <param name="text">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
     public IndentedStringBuilder Append(ReadOnlySpan<char> text) => AppendCore(text, false);
+
+    /// <summary>
+    /// 添加换行符。
+    /// </summary>
+    /// <returns>辅助链式调用。</returns>
+    public IndentedStringBuilder AppendLine() => AppendCore([], true);
+
+    /// <summary>
+    /// 添加文本，并继续添加换行符。
+    /// </summary>
+    /// <param name="text">要写入的文本。</param>
+    /// <returns>辅助链式调用。</returns>
+    public IndentedStringBuilder AppendLine(string text) => AppendCore(text.AsSpan(), true);
+
+    /// <summary>
+    /// 添加文本，并继续添加换行符。
+    /// </summary>
+    /// <param name="text">要写入的文本。</param>
+    /// <param name="lineProcessor">
+    /// 用于处理行的行处理器。<br/>
+    /// 如果想临时禁用全局设置的行处理器，可传入 <see cref="IndentLineProcessors.Default"/>。
+    /// </param>
+    /// <returns>辅助链式调用。</returns>
+    public IndentedStringBuilder AppendLine(string text, IndentLineProcessorHandler lineProcessor)
+    {
+        _tempProcessor = lineProcessor;
+        try
+        {
+            return AppendLine(text);
+        }
+        finally
+        {
+            _tempProcessor = null;
+        }
+    }
+
+    /// <summary>
+    /// 添加文本，并继续添加换行符。
+    /// </summary>
+    /// <param name="text">要写入的文本。</param>
+    /// <returns>辅助链式调用。</returns>
+    public IndentedStringBuilder AppendLine(ReadOnlySpan<char> text) => AppendCore(text, true);
 
     /// <summary>
     /// 直接添加原始字符串，不进行任何处理（不考虑缩进，也不处理换行符）。<br/>
@@ -91,26 +156,6 @@ public class IndentedStringBuilder
         _builder.Append(NewLine);
         return this;
     }
-
-    /// <summary>
-    /// 添加换行符。
-    /// </summary>
-    /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine() => AppendCore([], true);
-
-    /// <summary>
-    /// 添加文本，并继续添加换行符。
-    /// </summary>
-    /// <param name="text">要写入的文本。</param>
-    /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine(string text) => AppendCore(text.AsSpan(), true);
-
-    /// <summary>
-    /// 添加文本，并继续添加换行符。
-    /// </summary>
-    /// <param name="text">要写入的文本。</param>
-    /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine(ReadOnlySpan<char> text) => AppendCore(text, true);
 
     private IndentedStringBuilder AppendCore(ReadOnlySpan<char> text, bool newLine)
     {
@@ -209,7 +254,8 @@ public class IndentedStringBuilder
     /// <returns>处理结果，指示此行文本是否进行缩进。</returns>
     private IndentLineProcessedResult ProcessLine(ReadOnlySpan<char> line)
     {
-        return LineProcessor is { } processor
+        var processor = _tempProcessor ?? LineProcessor;
+        return processor is not null
             ? processor(line)
             : new IndentLineProcessedResult(IndentLineType.NormalLine, 0, line.Length);
     }
@@ -276,41 +322,49 @@ public class IndentedStringBuilder
 public static class IndentLineProcessors
 {
     /// <summary>
+    /// 默认行处理器，所有行均视为普通文本行，进行缩进处理。
+    /// </summary>
+    public static IndentLineProcessorHandler Default { get; } = DefaultLineProcessor;
+
+    /// <summary>
     /// C# 代码行处理器。<br/>
     /// 此处理器会：
     /// <list type="bullet">
     /// <item>识别预处理指令行（以 # 开头的行），并确保这些行不进行缩进。</item>
-    /// <item>确保不存在行尾多余的空白字符。</item>
-    /// <item>确保不存在只有空白字符的行。</item>
     /// </list>
     /// 识别预处理指令行（以 # 开头的行），并确保这些行不进行缩进。
     /// </summary>
-    public static IndentLineProcessorHandler CSharp => ProcessCSharpCodeLine;
+    public static IndentLineProcessorHandler CSharp { get; } = ProcessCSharpCodeLine;
+
+    /// <summary>
+    /// 默认行处理器，所有行均视为普通文本行，进行缩进处理。
+    /// </summary>
+    /// <param name="line">当前行文本（不包含换行符）。</param>
+    /// <returns>处理结果，指示此行文本是否进行缩进。</returns>
+    private static IndentLineProcessedResult DefaultLineProcessor(ReadOnlySpan<char> line)
+    {
+        return new IndentLineProcessedResult(IndentLineType.NormalLine, 0, line.Length);
+    }
 
     private static IndentLineProcessedResult ProcessCSharpCodeLine(ReadOnlySpan<char> line)
     {
         // 查看当前行是否满足：行首是空白字符，随后紧跟着预处理命令 # 字符。
-        var (offset, length) = line.GetTrimmedRange().GetOffsetAndLength(line.Length);
-        return length > 0 && line[offset] == '#'
+        var index = line.GetTrimmedIndex();
+        return index < line.Length && line[index] == '#'
             // 是预处理命令行，直接写入，不考虑缩进。
-            ? new IndentLineProcessedResult(IndentLineType.NoIndentLine, offset, length)
+            ? new IndentLineProcessedResult(IndentLineType.NoIndentLine, index, line.Length - index)
             // 不是预处理命令行，视为普通代码行，考虑缩进。
-            : new IndentLineProcessedResult(IndentLineType.NormalLine, 0, offset + length);
+            : new IndentLineProcessedResult(IndentLineType.NormalLine, 0, line.Length);
     }
 
-    private static Range GetTrimmedRange(this ReadOnlySpan<char> span)
+    private static int GetTrimmedIndex(this ReadOnlySpan<char> span)
     {
         var startingIndex = 0;
-        var endingIndex = span.Length - 1;
         while (startingIndex < span.Length && char.IsWhiteSpace(span[startingIndex]))
         {
             startingIndex++;
         }
-        while (endingIndex >= 0 && char.IsWhiteSpace(span[endingIndex]))
-        {
-            endingIndex--;
-        }
-        return new Range(startingIndex, endingIndex + 1);
+        return startingIndex;
     }
 }
 
