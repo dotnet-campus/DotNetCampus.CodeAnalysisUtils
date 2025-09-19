@@ -12,8 +12,6 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <EmbedAllSources Condition="'$(Configuration)' != 'debug'">true</EmbedAllSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
