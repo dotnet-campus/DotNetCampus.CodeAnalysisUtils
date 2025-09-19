@@ -9,9 +9,6 @@
     <PackageId>DotNetCampus.CodeAnalysisUtils</PackageId>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <EmbedAllSources Condition="'$(Configuration)' != 'debug'">true</EmbedAllSources>
   </PropertyGroup>
 
   <ItemGroup>

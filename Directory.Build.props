@@ -12,7 +12,6 @@
     <!-- 构建 -->
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts\</ArtifactsPath>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <!--
       Adding NoWarn to remove build warnings
       NU1507: Warning when there are multiple package sources when using CPM with no source mapping
