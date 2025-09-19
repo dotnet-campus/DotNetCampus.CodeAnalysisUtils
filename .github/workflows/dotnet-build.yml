@@ -1,0 +1,16 @@
+name: .NET Build
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Build with dotnet
+      run: dotnet build --configuration release
+    - name: Test
+      run: dotnet test --configuration release --no-build

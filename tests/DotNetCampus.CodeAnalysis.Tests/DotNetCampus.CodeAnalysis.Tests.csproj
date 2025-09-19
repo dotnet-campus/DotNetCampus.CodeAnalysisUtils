@@ -5,6 +5,8 @@
     <RootNamespace>DotNetCampus.CodeAnalysis.Tests</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsRoslynComponent>true</IsRoslynComponent>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
