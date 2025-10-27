@@ -29,14 +29,14 @@ internal static class AnalyzerConfigOptionsExtensions
             value = ConvertFromString<T>(stringValue);
             return new AnalyzerConfigOptionResult(options, true)
             {
-                UnsetPropertyNames = [],
+                UnsetPropertyNames = ImmutableList<string>.Empty,
             };
         }
 
         value = default!;
         return new AnalyzerConfigOptionResult(options, false)
         {
-            UnsetPropertyNames = [key],
+            UnsetPropertyNames = ImmutableList.Create<string>(key),
         };
     }
 
