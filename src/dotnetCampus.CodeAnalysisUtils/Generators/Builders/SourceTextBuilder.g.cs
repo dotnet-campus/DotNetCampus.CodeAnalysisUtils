@@ -41,6 +41,11 @@ public class SourceTextBuilder : IDisposable,
     public bool UseFileScopedNamespace { get; init; } = true;
 
     /// <summary>
+    /// 此源代码文件的可空注解上下文。
+    /// </summary>
+    public NullableAnnotationContext? Nullable { get; init; } = NullableAnnotationContext.Enable;
+
+    /// <summary>
     /// 此源代码文件的命名空间。（目前一个源代码文件只支持一个命名空间。）
     /// </summary>
     public string? Namespace { get; }
@@ -161,7 +166,17 @@ public class SourceTextBuilder : IDisposable,
     /// <inheritdoc cref="IndentSourceTextBuilder.BuildInto(IndentedStringBuilder)" />
     private void BuildInto(IndentedStringBuilder builder)
     {
-        builder.AppendLine("#nullable enable");
+        if (Nullable is { } nullable)
+        {
+            builder.AppendLine($"#nullable {nullable switch
+            {
+                NullableAnnotationContext.Disable => "disable",
+                NullableAnnotationContext.Enable => "enable",
+                NullableAnnotationContext.Warnings => "warnings",
+                NullableAnnotationContext.Annotations => "annotations",
+                _ => throw new ArgumentOutOfRangeException(),
+            }}");
+        }
 
         // usings
         foreach (var line in _systemUsings.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
@@ -748,6 +763,32 @@ public class TypeConstraintsSourceTextBuilder(SourceTextBuilder root) : IndentSo
             builder.AppendLine(i == _typeConstraints.Count - 1 ? $"{constraint}" : $"{constraint},");
         }
     }
+}
+
+/// <summary>
+/// 可空注解上下文。
+/// </summary>
+public enum NullableAnnotationContext
+{
+    /// <summary>
+    /// The code is nullable-oblivious. Disable matches the behavior before nullable reference types were enabled, except the new syntax produces warnings instead of errors.
+    /// </summary>
+    Disable,
+
+    /// <summary>
+    /// The compiler enables all null reference analysis and all language features.
+    /// </summary>
+    Enable,
+
+    /// <summary>
+    /// The compiler performs all null analysis and emits warnings when code might dereference null.
+    /// </summary>
+    Warnings,
+
+    /// <summary>
+    /// The compiler doesn't emit warnings when code might dereference null, or when you assign a maybe-null expression to a non-nullable variable.
+    /// </summary>
+    Annotations,
 }
 
 /// <summary>
