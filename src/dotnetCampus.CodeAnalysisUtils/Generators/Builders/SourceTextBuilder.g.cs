@@ -399,7 +399,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private AttributeListSourceTextBuilder? _attributeListBuilder;
     private TypeConstraintsSourceTextBuilder? _typeConstraintBuilder;
-    private readonly CodeBlockSourceTextBuilder _methodBody = new CodeBlockSourceTextBuilder(root);
+    private CodeBlockSourceTextBuilder? _methodBody;
 
     DocumentationCommentSourceTextBuilder IAllowDocumentationComment.DocumentationCommentBuilder =>
         _documentationCommentBuilder ??= new DocumentationCommentSourceTextBuilder(Root);
@@ -420,15 +420,17 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// </summary>
     public bool UseExpressionBody { get; init; }
 
+    private CodeBlockSourceTextBuilder MethodBody => _methodBody ??= new CodeBlockSourceTextBuilder(Root) { IsExpression = UseExpressionBody };
+
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
     void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) =>
-        ((IAllowNestedSourceTextBuilder)_methodBody).AddNestedSourceCode(memberBuilder);
+        ((IAllowNestedSourceTextBuilder)MethodBody).AddNestedSourceCode(memberBuilder);
 
     /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
     public MethodDeclarationSourceTextBuilder AddRawText(string rawText)
     {
-        _methodBody.AddRawText(rawText);
+        MethodBody.AddRawText(rawText);
         return this;
     }
 
@@ -461,7 +463,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         if (UseExpressionBody)
         {
             builder.Append(" => ");
-            _methodBody.BuildInto(builder);
+            MethodBody.BuildInto(builder);
             builder.TrimEnd();
             builder.AppendLine(";");
         }
@@ -469,7 +471,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             using (new BracketScope(builder))
             {
-                _methodBody.BuildInto(builder);
+                MethodBody.BuildInto(builder);
             }
         }
     }
@@ -490,13 +492,28 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     internal bool WrapWithBracket { get; init; }
 
     /// <summary>
+    /// 指示这是否是一个表达式代码块。<br/>
+    /// 如果是，则在代码前后不会换行。
+    /// </summary>
+    public bool IsExpression { get; init; }
+
+    /// <summary>
     /// 代码块的头部文本。如果不为 <see langword="null"/>，则在代码块开始前添加此文本。<br/>
     /// 适用于构建 if (xxx), _ => xxx switch 等需要在代码块前添加头部文本的场景。
     /// </summary>
     /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
+    /// 当 <see cref="WrapWithBracket"/> 或 <see cref="IsExpression"/> 为 <see langword="true"/> 时，此属性才有效。
     /// </remarks>
     internal string? Header { get; init; }
+
+    /// <summary>
+    /// 代码块的尾部文本。如果不为 <see langword="null"/>，则在代码块结束后添加此文本。<br/>
+    /// 适用于构建 }); 等这种大括号后还有尾部文本的场景。
+    /// </summary>
+    /// <remarks>
+    /// 当 <see cref="WrapWithBracket"/> 或 <see cref="IsExpression"/> 为 <see langword="true"/> 时，此属性才有效。
+    /// </remarks>
+    internal string? Footer { get; init; }
 
     /// <summary>
     /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
@@ -520,6 +537,9 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// 指示这是否是一个用于分隔上下代码块的空行。<br/>
     /// 如果是，则在生成代码时会在此代码块前后各添加一个空行。
     /// </summary>
+    /// <remarks>
+    /// 当为 <see langword="true"/> 时，其他所有属性都无效。
+    /// </remarks>
     internal bool IsLineSeparator { get; init; }
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
@@ -540,31 +560,57 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
-        for (var i = 0; i < _statements.Count; i++)
+        if (Header is { } header)
         {
-            var statement = _statements[i];
-            var isLineSeparator = statement is CodeBlockSourceTextBuilder { IsLineSeparator: true } && i > 0 && i < _statements.Count - 1;
-            if (isLineSeparator)
+            if (IsExpression)
             {
-                builder.AppendLine();
-                continue;
-            }
-
-            if (statement is CodeBlockSourceTextBuilder { WrapWithBracket: true } codeBlock)
-            {
-                if (codeBlock.Header is { } header)
-                {
-                    builder.AppendLine(header);
-                }
-
-                using (new BracketScope(builder, 1, codeBlock.StartBracket, codeBlock.EndBracket))
-                {
-                    codeBlock.BuildInto(builder);
-                }
+                builder.Append(header);
             }
             else
             {
+                builder.AppendLine(header);
+            }
+        }
+
+        if (IsExpression && !WrapWithBracket)
+        {
+            builder.TrimEnd();
+        }
+
+        if (WrapWithBracket)
+        {
+            using (new BracketScope(builder, 1, StartBracket, EndBracket))
+            {
+                for (var i = 0; i < _statements.Count; i++)
+                {
+                    var statement = _statements[i];
+                    statement.BuildInto(builder);
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < _statements.Count; i++)
+            {
+                var statement = _statements[i];
                 statement.BuildInto(builder);
+            }
+        }
+
+        if (IsExpression)
+        {
+            builder.TrimEnd();
+        }
+
+        if (Footer is { } footer)
+        {
+            if (IsExpression)
+            {
+                builder.Append(footer);
+            }
+            else
+            {
+                builder.AppendLine(footer);
             }
         }
     }
