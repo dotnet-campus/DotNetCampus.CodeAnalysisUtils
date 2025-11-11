@@ -266,7 +266,7 @@ public class IndentedStringBuilder
     /// <returns>辅助链式调用。</returns>
     public IndentedStringBuilder TrimEnd()
     {
-        // 1. 如果 _lineBuffer 中存在内容，先去除 _lineBuffer 的尾随空白字符。
+        // 1. 如果 _lineBuffer 中存在内容，去除其尾随空白。
         if (_lineBuffer.Length > 0)
         {
             var lineEndLength = _lineBuffer.Length;
@@ -282,21 +282,22 @@ public class IndentedStringBuilder
                 }
             }
             _lineBuffer.Length = lineEndLength;
-
-            // 2. 如果去除尾随空白后 _lineBuffer 仍有内容，则到此为止。
-            if (_lineBuffer.Length > 0)
-            {
-                return this;
-            }
+            return this;
         }
 
-        // 3. 到这里说明 _lineBuffer 为空，需要去除 _builder 的尾随空白。
-        var totalEndLength = _builder.Length;
+        // 2. 如果 _lineBuffer 为空，需要处理 _builder 的尾随空白。
+        if (_builder.Length == 0)
+        {
+            return this;
+        }
+
+        // 3. 去除 _builder 末尾的所有空白字符（包括换行符）。
+        var trimmedEndIndex = _builder.Length;
         for (var i = _builder.Length - 1; i >= 0; i--)
         {
             if (char.IsWhiteSpace(_builder[i]))
             {
-                totalEndLength--;
+                trimmedEndIndex--;
             }
             else
             {
@@ -304,24 +305,57 @@ public class IndentedStringBuilder
             }
         }
 
-        // 4. 找到最后一个换行符的位置，将其后的内容移到 _lineBuffer。
-        var lastLineStartIndex = totalEndLength;
-        for (var i = totalEndLength - 1; i >= 0; i--)
+        // 4. 在去除空白后的内容中，从后向前查找最后一个换行符。
+        var lastNewLineIndex = -1;
+        for (var i = trimmedEndIndex - 1; i >= 0; i--)
         {
             if (_builder[i] == NewLine[^1])
             {
-                // 找到了换行符，最后一行从下一个字符开始。
+                lastNewLineIndex = i;
                 break;
             }
-            lastLineStartIndex--;
         }
 
-        // 5. 将最后一行从 _builder 中移到 _lineBuffer。
-        for (var i = lastLineStartIndex; i < totalEndLength; i++)
+        // 5. 将最后一行（不含缩进的部分）移到 _lineBuffer。
+        if (lastNewLineIndex >= 0)
         {
-            _lineBuffer.Append(_builder[i]);
+            // 找到了换行符，提取换行符之后到 trimmedEndIndex 的内容（这部分包含缩进）。
+            var lastLineStart = lastNewLineIndex + 1;
+
+            // 跳过行首的缩进空格（因为后续输出时会重新应用缩进）。
+            var contentStart = lastLineStart;
+            while (contentStart < trimmedEndIndex && _builder[contentStart] == ' ')
+            {
+                contentStart++;
+            }
+
+            // 将去除缩进后的内容移到 _lineBuffer。
+            for (var i = contentStart; i < trimmedEndIndex; i++)
+            {
+                _lineBuffer.Append(_builder[i]);
+            }
+
+            // _builder 保留到换行符（包含换行符）。
+            _builder.Length = lastNewLineIndex + 1;
         }
-        _builder.Length = lastLineStartIndex;
+        else
+        {
+            // 没有找到换行符，说明整个 _builder 都是最后一行。
+            // 跳过行首的缩进空格。
+            var contentStart = 0;
+            while (contentStart < trimmedEndIndex && _builder[contentStart] == ' ')
+            {
+                contentStart++;
+            }
+
+            // 将去除缩进后的内容移到 _lineBuffer。
+            for (var i = contentStart; i < trimmedEndIndex; i++)
+            {
+                _lineBuffer.Append(_builder[i]);
+            }
+
+            _builder.Length = 0;
+        }
 
         return this;
     }
@@ -332,6 +366,23 @@ public class IndentedStringBuilder
     /// <returns>当前构建的字符串。</returns>
     public override string ToString()
     {
+        // 如果 _lineBuffer 中有内容，需要先将其写入 _builder。
+        if (_lineBuffer.Length > 0)
+        {
+            // 临时将 _lineBuffer 的内容写入，但不清空 _lineBuffer。
+            var tempBuilder = new StringBuilder(_builder.Length + _lineBuffer.Length * 2);
+            tempBuilder.Append(_builder);
+
+            // 应用缩进并写入 _lineBuffer 的内容。
+            for (var i = 0; i < IndentLevel; i++)
+            {
+                tempBuilder.Append(Indentation);
+            }
+            tempBuilder.Append(_lineBuffer);
+
+            return tempBuilder.ToString();
+        }
+
         return _builder.ToString();
     }
 
