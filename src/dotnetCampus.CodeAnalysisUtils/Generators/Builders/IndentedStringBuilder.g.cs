@@ -266,19 +266,63 @@ public class IndentedStringBuilder
     /// <returns>辅助链式调用。</returns>
     public IndentedStringBuilder TrimEnd()
     {
-        var newLength = _builder.Length;
+        // 1. 如果 _lineBuffer 中存在内容，先去除 _lineBuffer 的尾随空白字符。
+        if (_lineBuffer.Length > 0)
+        {
+            var lineEndLength = _lineBuffer.Length;
+            for (var i = _lineBuffer.Length - 1; i >= 0; i--)
+            {
+                if (char.IsWhiteSpace(_lineBuffer[i]))
+                {
+                    lineEndLength--;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            _lineBuffer.Length = lineEndLength;
+
+            // 2. 如果去除尾随空白后 _lineBuffer 仍有内容，则到此为止。
+            if (_lineBuffer.Length > 0)
+            {
+                return this;
+            }
+        }
+
+        // 3. 到这里说明 _lineBuffer 为空，需要去除 _builder 的尾随空白。
+        var totalEndLength = _builder.Length;
         for (var i = _builder.Length - 1; i >= 0; i--)
         {
             if (char.IsWhiteSpace(_builder[i]))
             {
-                newLength--;
+                totalEndLength--;
             }
             else
             {
                 break;
             }
         }
-        _builder.Length = newLength;
+
+        // 4. 找到最后一个换行符的位置，将其后的内容移到 _lineBuffer。
+        var lastLineStartIndex = totalEndLength;
+        for (var i = totalEndLength - 1; i >= 0; i--)
+        {
+            if (_builder[i] == NewLine[^1])
+            {
+                // 找到了换行符，最后一行从下一个字符开始。
+                break;
+            }
+            lastLineStartIndex--;
+        }
+
+        // 5. 将最后一行从 _builder 中移到 _lineBuffer。
+        for (var i = lastLineStartIndex; i < totalEndLength; i++)
+        {
+            _lineBuffer.Append(_builder[i]);
+        }
+        _builder.Length = lastLineStartIndex;
+
         return this;
     }
 
