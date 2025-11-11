@@ -266,98 +266,84 @@ public class IndentedStringBuilder
     /// <returns>辅助链式调用。</returns>
     public IndentedStringBuilder TrimEnd()
     {
-        // 1. 如果 _lineBuffer 中存在内容，去除其尾随空白。
+        // 如果 _lineBuffer 中存在内容，去除其尾随空白。
         if (_lineBuffer.Length > 0)
         {
-            var lineEndLength = _lineBuffer.Length;
-            for (var i = _lineBuffer.Length - 1; i >= 0; i--)
+            _lineBuffer.Length = GetTrimmedLength(_lineBuffer);
+            return this;
+        }
+
+        // 如果 _builder 为空，无需处理。
+        if (_builder.Length == 0)
+        {
+            return this;
+        }
+
+        // 去除 _builder 末尾的所有空白字符后的长度。
+        var trimmedLength = GetTrimmedLength(_builder);
+
+        // 在去除空白后的内容中，从后向前查找最后一个换行符。
+        var lastNewLineIndex = FindLastNewLineIndex(_builder, trimmedLength, NewLine[^1]);
+
+        // 计算最后一行的起始位置（换行符之后，或者从 0 开始）。
+        var lastLineStart = lastNewLineIndex >= 0 ? lastNewLineIndex + 1 : 0;
+
+        // 跳过行首的缩进空格，找到实际内容的起始位置。
+        var contentStart = SkipLeadingSpaces(_builder, lastLineStart, trimmedLength);
+
+        // 将去除缩进后的内容移到 _lineBuffer。
+        MoveRangeToTarget(_builder, _lineBuffer, contentStart, trimmedLength);
+
+        // _builder 保留到换行符（包含换行符），如果没有换行符则清空。
+        _builder.Length = lastNewLineIndex >= 0 ? lastNewLineIndex + 1 : 0;
+
+        return this;
+
+        static int GetTrimmedLength(StringBuilder builder)
+        {
+            var length = builder.Length;
+            for (var i = builder.Length - 1; i >= 0; i--)
             {
-                if (char.IsWhiteSpace(_lineBuffer[i]))
+                if (char.IsWhiteSpace(builder[i]))
                 {
-                    lineEndLength--;
+                    length--;
                 }
                 else
                 {
                     break;
                 }
             }
-            _lineBuffer.Length = lineEndLength;
-            return this;
+            return length;
         }
 
-        // 2. 如果 _lineBuffer 为空，需要处理 _builder 的尾随空白。
-        if (_builder.Length == 0)
+        static int FindLastNewLineIndex(StringBuilder builder, int endIndex, char newLine)
         {
-            return this;
+            for (var i = endIndex - 1; i >= 0; i--)
+            {
+                if (builder[i] == newLine)
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
 
-        // 3. 去除 _builder 末尾的所有空白字符（包括换行符）。
-        var trimmedEndIndex = _builder.Length;
-        for (var i = _builder.Length - 1; i >= 0; i--)
+        static int SkipLeadingSpaces(StringBuilder builder, int start, int end)
         {
-            if (char.IsWhiteSpace(_builder[i]))
+            while (start < end && builder[start] == ' ')
             {
-                trimmedEndIndex--;
+                start++;
             }
-            else
-            {
-                break;
-            }
+            return start;
         }
 
-        // 4. 在去除空白后的内容中，从后向前查找最后一个换行符。
-        var lastNewLineIndex = -1;
-        for (var i = trimmedEndIndex - 1; i >= 0; i--)
+        static void MoveRangeToTarget(StringBuilder source, StringBuilder target, int start, int end)
         {
-            if (_builder[i] == NewLine[^1])
+            for (var i = start; i < end; i++)
             {
-                lastNewLineIndex = i;
-                break;
+                target.Append(source[i]);
             }
         }
-
-        // 5. 将最后一行（不含缩进的部分）移到 _lineBuffer。
-        if (lastNewLineIndex >= 0)
-        {
-            // 找到了换行符，提取换行符之后到 trimmedEndIndex 的内容（这部分包含缩进）。
-            var lastLineStart = lastNewLineIndex + 1;
-
-            // 跳过行首的缩进空格（因为后续输出时会重新应用缩进）。
-            var contentStart = lastLineStart;
-            while (contentStart < trimmedEndIndex && _builder[contentStart] == ' ')
-            {
-                contentStart++;
-            }
-
-            // 将去除缩进后的内容移到 _lineBuffer。
-            for (var i = contentStart; i < trimmedEndIndex; i++)
-            {
-                _lineBuffer.Append(_builder[i]);
-            }
-
-            // _builder 保留到换行符（包含换行符）。
-            _builder.Length = lastNewLineIndex + 1;
-        }
-        else
-        {
-            // 没有找到换行符，说明整个 _builder 都是最后一行。
-            // 跳过行首的缩进空格。
-            var contentStart = 0;
-            while (contentStart < trimmedEndIndex && _builder[contentStart] == ' ')
-            {
-                contentStart++;
-            }
-
-            // 将去除缩进后的内容移到 _lineBuffer。
-            for (var i = contentStart; i < trimmedEndIndex; i++)
-            {
-                _lineBuffer.Append(_builder[i]);
-            }
-
-            _builder.Length = 0;
-        }
-
-        return this;
     }
 
     /// <summary>
