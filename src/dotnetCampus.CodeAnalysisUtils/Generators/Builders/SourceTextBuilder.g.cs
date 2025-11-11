@@ -445,14 +445,18 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             attributeListBuilder.BuildInto(builder);
         }
+        
+        // 写入方法签名。
         if (UseExpressionBody)
         {
-            builder.Append(Signature);
+            builder.Append(Signature).Append(" => ");
         }
         else
         {
             builder.AppendLine(Signature);
         }
+        
+        // 写入泛型约束。
         if (_typeConstraintBuilder is { } typeConstraintBuilder)
         {
             using (builder.IndentIn())
@@ -460,15 +464,17 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
                 typeConstraintBuilder.BuildInto(builder);
             }
         }
+        
+        // 写入方法体。
         if (UseExpressionBody)
         {
-            builder.Append(" => ");
+            // 表达式主体：直接输出内容，最后加分号。
             MethodBody.BuildInto(builder);
-            builder.TrimEnd();
-            builder.AppendLine(";");
+            builder.TrimEnd().AppendLine(";");
         }
         else
         {
+            // 普通方法体：用大括号包裹。
             using (new BracketScope(builder))
             {
                 MethodBody.BuildInto(builder);
@@ -560,25 +566,25 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
+        // 1. 写入 Header（如果有）。
         if (Header is { } header)
         {
             if (IsExpression)
             {
+                // 表达式的 Header，不换行。
                 builder.Append(header);
             }
             else
             {
+                // 普通语句的 Header，换行。
                 builder.AppendLine(header);
             }
         }
 
-        if (IsExpression && !WrapWithBracket)
-        {
-            builder.TrimEnd();
-        }
-
+        // 2. 写入代码块内容。
         if (WrapWithBracket)
         {
+            // 用大括号包裹。
             using (new BracketScope(builder, 1, StartBracket, EndBracket))
             {
                 for (var i = 0; i < _statements.Count; i++)
@@ -590,6 +596,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
         else
         {
+            // 不用大括号包裹，直接输出。
             for (var i = 0; i < _statements.Count; i++)
             {
                 var statement = _statements[i];
@@ -597,19 +604,23 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
             }
         }
 
+        // 3. 表达式需要去除尾随空白。
         if (IsExpression)
         {
             builder.TrimEnd();
         }
 
+        // 4. 写入 Footer（如果有）。
         if (Footer is { } footer)
         {
             if (IsExpression)
             {
+                // 表达式的 Footer，不换行。
                 builder.Append(footer);
             }
             else
             {
+                // 普通语句的 Footer，换行。
                 builder.AppendLine(footer);
             }
         }
