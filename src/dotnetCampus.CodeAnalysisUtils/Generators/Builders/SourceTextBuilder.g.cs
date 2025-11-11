@@ -10,7 +10,7 @@ namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 /// 辅助链式生成源代码文本的构建器。
 /// </summary>
 public class SourceTextBuilder : IDisposable,
-    IAllowScopedNamespace, IAllowTypeDeclaration, IAllowStatements
+    IAllowScopedNamespace, IAllowTypeDeclaration, IAllowStatement
 {
     private readonly HashSet<string> _systemUsings = [];
     private readonly HashSet<string> _otherUsings = [];
@@ -394,7 +394,7 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
 public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : IndentSourceTextBuilder(root),
-    IAllowStatements, IAllowMethodDeclaration, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
+    IAllowStatement, IAllowMethodDeclaration, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
 {
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private AttributeListSourceTextBuilder? _attributeListBuilder;
@@ -414,6 +414,11 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// 方法签名行（如 "public void MyMethod()"）。
     /// </summary>
     public string Signature { get; } = signature;
+
+    /// <summary>
+    /// 是否使用表达式主体（=>）来定义方法体。当设为 <see langword="true"/> 时，不会再自动添加大括号包裹，所有添加到方法体的语句都将视为表达式主体的一部分。
+    /// </summary>
+    public bool UseExpressionBody { get; init; }
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
@@ -438,7 +443,14 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             attributeListBuilder.BuildInto(builder);
         }
-        builder.AppendLine(Signature);
+        if (UseExpressionBody)
+        {
+            builder.Append(Signature);
+        }
+        else
+        {
+            builder.AppendLine(Signature);
+        }
         if (_typeConstraintBuilder is { } typeConstraintBuilder)
         {
             using (builder.IndentIn())
@@ -446,9 +458,19 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
                 typeConstraintBuilder.BuildInto(builder);
             }
         }
-        using (new BracketScope(builder))
+        if (UseExpressionBody)
         {
+            builder.Append(" => ");
             _methodBody.BuildInto(builder);
+            builder.TrimEnd();
+            builder.AppendLine(";");
+        }
+        else
+        {
+            using (new BracketScope(builder))
+            {
+                _methodBody.BuildInto(builder);
+            }
         }
     }
 }
@@ -458,7 +480,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
 /// </summary>
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuilder(root),
-    IAllowStatements
+    IAllowStatement
 {
     private readonly List<IndentSourceTextBuilder> _statements = [];
 
