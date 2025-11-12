@@ -328,7 +328,7 @@ public static class AllowStatementExtensions
     {
         builder.AddNestedSourceCode(new CodeBlockSourceTextBuilder(builder.Root)
         {
-            Structure = CodeBlockStructure.LineSeparator,
+            IsLineSeparator = true,
         });
         return builder;
     }
@@ -345,7 +345,6 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            Structure = CodeBlockStructure.StatementBlock,
         };
         codeBlockBuilder(codeBlock);
         builder.AddNestedSourceCode(codeBlock);
@@ -367,7 +366,7 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            Structure = CodeBlockStructure.Expression,
+            IsExpression = true,
             Header = prefix,
             Footer = suffix,
         };
@@ -391,7 +390,6 @@ public static class AllowStatementExtensions
         {
             var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
             {
-                Structure = CodeBlockStructure.StatementBlock,
             };
             codeBlockBuilder(codeBlock, item);
             builder.AddNestedSourceCode(codeBlock);
@@ -491,7 +489,35 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            Structure = CodeBlockStructure.BracketBlock,
+            IsBracketBlock = true,
+            Header = header,
+            StartBracket = startBracket,
+            EndBracket = endBracket,
+        };
+        codeBlockBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 添加一个大括号作用域代码块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
+    /// <param name="startBracket">自定义起始括号。适用于有多层括号时的场景。</param>
+    /// <param name="endBracket">自定义结束括号。适用于有多层括号时的场景。</param>
+    /// <param name="isExpressionBody">整个代码块是否作为表达式主体使用。</param>
+    /// <param name="codeBlockBuilder">代码块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
+        string? header, string startBracket, string endBracket, bool isExpressionBody,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+            IsBracketBlock = true,
+            IsExpression = true,
             Header = header,
             StartBracket = startBracket,
             EndBracket = endBracket,

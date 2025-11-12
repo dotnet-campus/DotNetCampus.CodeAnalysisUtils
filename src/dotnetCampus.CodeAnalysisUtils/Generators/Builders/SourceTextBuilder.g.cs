@@ -229,7 +229,7 @@ public class SourceTextBuilder : IDisposable,
             if (topLevelCode is CodeBlockSourceTextBuilder codeBlock)
             {
                 // 顶级语句。
-                var isLineSeparator = codeBlock.Structure == CodeBlockStructure.LineSeparator && i > 0 && i < _topLevelCodes.Count - 1;
+                var isLineSeparator = codeBlock.IsLineSeparator && i > 0 && i < _topLevelCodes.Count - 1;
                 if (isLineSeparator)
                 {
                     builder.AppendLine();
@@ -422,7 +422,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
 
     private CodeBlockSourceTextBuilder MethodBody => _methodBody ??= new CodeBlockSourceTextBuilder(Root)
     {
-        Structure = UseExpressionBody ? CodeBlockStructure.Expression : CodeBlockStructure.StatementBlock
+        IsExpression = UseExpressionBody
     };
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
@@ -496,9 +496,19 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     private readonly List<IndentSourceTextBuilder> _statements = [];
 
     /// <summary>
-    /// 代码块的结构类型。
+    /// 整个代码块作为表达式使用。
     /// </summary>
-    public required CodeBlockStructure Structure { get; init; }
+    public bool IsExpression { get; init; }
+
+    /// <summary>
+    /// 代码块包裹在一组大括号中。
+    /// </summary>
+    public bool IsBracketBlock { get; init; }
+
+    /// <summary>
+    /// 代码块是行分隔符。
+    /// </summary>
+    public bool IsLineSeparator { get; init; }
 
     /// <summary>
     /// 代码块的头部文本。如果不为 <see langword="null"/>，则在代码块开始前添加此文本。<br/>
@@ -513,13 +523,13 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     internal string? Footer { get; init; }
 
     /// <summary>
-    /// 自定义起始括号。仅当 <see cref="Structure"/> 为 <see cref="CodeBlockStructure.BracketBlock"/> 时有效。<br/>
+    /// 自定义起始括号。仅当 <see cref="IsBracketBlock"/> 为 <see langword="true"/> 时有效。<br/>
     /// 如果不设置，则使用默认的大括号 "{"。
     /// </summary>
     internal string StartBracket { get; init; } = "{";
 
     /// <summary>
-    /// 自定义结束括号。仅当 <see cref="Structure"/> 为 <see cref="CodeBlockStructure.BracketBlock"/> 时有效。<br/>
+    /// 自定义结束括号。仅当 <see cref="IsBracketBlock"/> 为 <see langword="true"/> 时有效。<br/>
     /// 如果不设置，则使用默认的大括号 "}"。
     /// </summary>
     internal string EndBracket { get; init; } = "}";
@@ -542,7 +552,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
-        BuildInto(builder, false);
+        BuildInto(builder, null);
     }
 
     /// <summary>
@@ -550,91 +560,71 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// </summary>
     /// <param name="builder">要构建到的 <see cref="IndentedStringBuilder"/> 实例。</param>
     /// <param name="expectExpressionPart">是否期望此代码块作为父代码块表达式的一部分。</param>
-    private void BuildInto(IndentedStringBuilder builder, bool expectExpressionPart)
+    private void BuildInto(IndentedStringBuilder builder, bool? expectExpressionPart)
     {
-        switch (Structure)
+        if (IsLineSeparator)
         {
-            case CodeBlockStructure.LineSeparator:
-                // 空行分隔符,不输出任何内容
-                break;
-
-            case CodeBlockStructure.StatementBlock:
-                BuildStatementBlock(builder, expectExpressionPart);
-                break;
-
-            case CodeBlockStructure.BracketBlock:
-                BuildBracketBlock(builder, expectExpressionPart);
-                break;
-
-            case CodeBlockStructure.Expression:
-                BuildExpression(builder, expectExpressionPart);
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException();
+            // 空行分隔符,不输出任何内容
+            return;
         }
-    }
 
-    private void BuildStatementBlock(IndentedStringBuilder builder, bool expectExpressionPart)
-    {
-        // Header 换行
         if (Header is { } header)
         {
-            builder.AppendLine(header);
-        }
-
-        // 内部语句正常输出
-        for (var i = 0; i < _statements.Count - 1; i++)
-        {
-            _statements[i].BuildInto(builder);
-        }
-        if (_statements.Count > 0)
-        {
-            if (_statements[^1] is CodeBlockSourceTextBuilder last && Footer is null)
+            if (IsExpression && !IsBracketBlock)
             {
-                last.BuildInto(builder, expectExpressionPart);
+                builder.Append(header);
             }
             else
             {
-                _statements[^1].BuildInto(builder);
+                builder.AppendLine(header);
             }
         }
 
-        // Footer 换行
-        if (Footer is { } footer)
+        var likeExpression =
+            // 父代码块期望内部代码块为表达式时，一定不能换行
+            expectExpressionPart is true
+            // 当前代码块本身就是表达式时，也不能换行
+            || IsExpression;
+        // Footer 如果非空，且当前代码块不是表达式时，最后一个语句需要换行。
+        var lastBlockIsExpression = likeExpression && (Footer is null && IsExpression);
+        if (IsBracketBlock)
         {
-            if (expectExpressionPart)
+            using (new BracketScope(builder, 1, StartBracket, EndBracket, likeExpression))
             {
-                builder.Append(footer);
-            }
-            else
-            {
-                builder.AppendLine(footer);
+                // 大括号内的换行不受父级影响。
+                for (var i = 0; i < _statements.Count; i++)
+                {
+                    _statements[i].BuildInto(builder);
+                }
             }
         }
-    }
-
-    private void BuildBracketBlock(IndentedStringBuilder builder, bool expectExpressionPart)
-    {
-        // Header 换行
-        if (Header is { } header)
+        else
         {
-            builder.AppendLine(header);
-        }
-
-        // 用大括号包裹,内部语句正常输出
-        using (new BracketScope(builder, 1, StartBracket, EndBracket, expectExpressionPart && Footer is null))
-        {
-            for (var i = 0; i < _statements.Count; i++)
+            // 非最后一个语句不受父级影响。
+            for (var i = 0; i < _statements.Count - 1; i++)
             {
                 _statements[i].BuildInto(builder);
             }
+
+            // 最后一个语句看情况。
+            if (_statements.Count > 0)
+            {
+                var lastStatement = _statements[^1];
+                if (lastBlockIsExpression && lastStatement is CodeBlockSourceTextBuilder last)
+                {
+                    last.BuildInto(builder, true);
+                }
+                else
+                {
+                    lastStatement.BuildInto(builder);
+                }
+            }
         }
 
-        // Footer 换行
+        // Footer
         if (Footer is { } footer)
         {
-            if (expectExpressionPart)
+            if (likeExpression)
             {
                 builder.Append(footer);
             }
@@ -645,43 +635,13 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
     }
 
-    private void BuildExpression(IndentedStringBuilder builder, bool expectExpressionPart)
+    /// <summary>
+    /// 转换为可在调试器中查看的信息。
+    /// </summary>
+    /// <returns></returns>
+    public override string ToString()
     {
-        // Header: 根据 prependNewLine 决定是否换行
-        if (Header is { } header)
-        {
-            builder.Append(header);
-        }
-
-        // 内部语句: 首个和末个可能需要特殊处理
-        for (var i = 0; i < _statements.Count - 1; i++)
-        {
-            _statements[i].BuildInto(builder);
-        }
-        if (_statements.Count > 0)
-        {
-            if (_statements[^1] is CodeBlockSourceTextBuilder last && Footer is null)
-            {
-                last.BuildInto(builder, expectExpressionPart);
-            }
-            else
-            {
-                _statements[^1].BuildInto(builder);
-            }
-        }
-
-        // Footer: 根据 appendNewLine 决定是否换行
-        if (Footer is { } footer)
-        {
-            if (expectExpressionPart)
-            {
-                builder.Append(footer);
-            }
-            else
-            {
-                builder.AppendLine(footer);
-            }
-        }
+        return $"{Header}+{_statements.Count}+{Footer}";
     }
 }
 
@@ -696,12 +656,12 @@ public enum CodeBlockStructure
     /// statement1;
     /// statement2;
     /// </code>
-    /// Header 和 Footer 都会换行(如果有),内部语句正常换行。
+    /// Header 和 Footer 都会换行，内部语句正常换行。
     /// </summary>
     StatementBlock,
 
     /// <summary>
-    /// 用大括号(或其他类似括号的结构)包裹的代码块。
+    /// 用大括号（或其他类似括号的结构）包裹的代码块。
     /// <code>
     /// if (condition)
     /// {
@@ -709,7 +669,7 @@ public enum CodeBlockStructure
     ///     statement2;
     /// }
     /// </code>
-    /// Header 换行后开始大括号块,内部语句正常换行,代码块结束后换行再写 Footer。
+    /// Header 换行后开始大括号块，内部语句正常换行，代码块结束后换行再写 Footer。
     /// </summary>
     BracketBlock,
 
@@ -722,7 +682,7 @@ public enum CodeBlockStructure
     ///     Prop2 = value2,
     /// };
     /// </code>
-    /// Header 不换行追加,内部语句正常换行,Footer 紧跟最后内容(通过 TrimEnd)不换行追加。
+    /// Header 不换行追加，内部语句正常换行，最后一个内部语句不换行，Footer 后也不换行。
     /// </summary>
     Expression,
 
@@ -731,7 +691,7 @@ public enum CodeBlockStructure
     /// <code>
     ///
     /// </code>
-    /// Header, Footer 以及代码块内容都无效,仅输出一个空行。
+    /// Header、Footer 以及代码块内容都无效，仅输出一个空行。
     /// </summary>
     LineSeparator,
 }
