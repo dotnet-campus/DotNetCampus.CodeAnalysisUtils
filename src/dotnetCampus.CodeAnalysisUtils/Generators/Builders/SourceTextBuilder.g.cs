@@ -542,6 +542,16 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
+        BuildInto(builder, false);
+    }
+
+    /// <summary>
+    /// 构建代码块到 <see cref="IndentedStringBuilder"/> 中。
+    /// </summary>
+    /// <param name="builder">要构建到的 <see cref="IndentedStringBuilder"/> 实例。</param>
+    /// <param name="expectExpressionPart">是否期望此代码块作为父代码块表达式的一部分。</param>
+    private void BuildInto(IndentedStringBuilder builder, bool expectExpressionPart)
+    {
         switch (Structure)
         {
             case CodeBlockStructure.LineSeparator:
@@ -549,15 +559,15 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
                 break;
 
             case CodeBlockStructure.StatementBlock:
-                BuildStatementBlock(builder);
+                BuildStatementBlock(builder, expectExpressionPart);
                 break;
 
             case CodeBlockStructure.BracketBlock:
-                BuildBracketBlock(builder);
+                BuildBracketBlock(builder, expectExpressionPart);
                 break;
 
             case CodeBlockStructure.Expression:
-                BuildExpression(builder);
+                BuildExpression(builder, expectExpressionPart);
                 break;
 
             default:
@@ -565,7 +575,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
     }
 
-    private void BuildStatementBlock(IndentedStringBuilder builder)
+    private void BuildStatementBlock(IndentedStringBuilder builder, bool expectExpressionPart)
     {
         // Header 换行
         if (Header is { } header)
@@ -574,19 +584,37 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
 
         // 内部语句正常输出
-        for (var i = 0; i < _statements.Count; i++)
+        for (var i = 0; i < _statements.Count - 1; i++)
         {
             _statements[i].BuildInto(builder);
+        }
+        if (_statements.Count > 0)
+        {
+            if (_statements[^1] is CodeBlockSourceTextBuilder last && Footer is null)
+            {
+                last.BuildInto(builder, expectExpressionPart);
+            }
+            else
+            {
+                _statements[^1].BuildInto(builder);
+            }
         }
 
         // Footer 换行
         if (Footer is { } footer)
         {
-            builder.AppendLine(footer);
+            if (expectExpressionPart)
+            {
+                builder.Append(footer);
+            }
+            else
+            {
+                builder.AppendLine(footer);
+            }
         }
     }
 
-    private void BuildBracketBlock(IndentedStringBuilder builder)
+    private void BuildBracketBlock(IndentedStringBuilder builder, bool expectExpressionPart)
     {
         // Header 换行
         if (Header is { } header)
@@ -595,7 +623,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
 
         // 用大括号包裹,内部语句正常输出
-        using (new BracketScope(builder, 1, StartBracket, EndBracket))
+        using (new BracketScope(builder, 1, StartBracket, EndBracket, expectExpressionPart && Footer is null))
         {
             for (var i = 0; i < _statements.Count; i++)
             {
@@ -606,28 +634,53 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         // Footer 换行
         if (Footer is { } footer)
         {
-            builder.AppendLine(footer);
+            if (expectExpressionPart)
+            {
+                builder.Append(footer);
+            }
+            else
+            {
+                builder.AppendLine(footer);
+            }
         }
     }
 
-    private void BuildExpression(IndentedStringBuilder builder)
+    private void BuildExpression(IndentedStringBuilder builder, bool expectExpressionPart)
     {
-        // Header 不换行追加
+        // Header: 根据 prependNewLine 决定是否换行
         if (Header is { } header)
         {
             builder.Append(header);
         }
 
-        // 内部语句正常输出(保持换行)
-        for (var i = 0; i < _statements.Count; i++)
+        // 内部语句: 首个和末个可能需要特殊处理
+        for (var i = 0; i < _statements.Count - 1; i++)
         {
             _statements[i].BuildInto(builder);
         }
+        if (_statements.Count > 0)
+        {
+            if (_statements[^1] is CodeBlockSourceTextBuilder last && Footer is null)
+            {
+                last.BuildInto(builder, expectExpressionPart);
+            }
+            else
+            {
+                _statements[^1].BuildInto(builder);
+            }
+        }
 
-        // Footer 紧跟最后内容,不换行追加
+        // Footer: 根据 appendNewLine 决定是否换行
         if (Footer is { } footer)
         {
-            builder.Append(footer);
+            if (expectExpressionPart)
+            {
+                builder.Append(footer);
+            }
+            else
+            {
+                builder.AppendLine(footer);
+            }
         }
     }
 }
@@ -934,8 +987,9 @@ file readonly ref struct BracketScope : IDisposable
     private readonly IndentedStringBuilder _builder;
     private readonly IndentedStringBuilder.IndentScope _indentScope;
     private readonly string? _endBracket;
+    private readonly bool _isPartOfExpression;
 
-    public BracketScope(IndentedStringBuilder builder, int levels = 1, string? startBracket = "{", string? endBracket = "}")
+    public BracketScope(IndentedStringBuilder builder, int levels = 1, string? startBracket = "{", string? endBracket = "}", bool isPartOfExpression = false)
     {
         _builder = builder;
         if (startBracket is not null)
@@ -943,6 +997,7 @@ file readonly ref struct BracketScope : IDisposable
             _builder.AppendLine(startBracket);
         }
         _endBracket = endBracket;
+        _isPartOfExpression = isPartOfExpression;
         _indentScope = builder.IndentIn(levels);
     }
 
@@ -951,7 +1006,14 @@ file readonly ref struct BracketScope : IDisposable
         _indentScope.Dispose();
         if (_endBracket is { } bracket)
         {
-            _builder.AppendLine(bracket);
+            if (_isPartOfExpression)
+            {
+                _builder.Append(bracket);
+            }
+            else
+            {
+                _builder.AppendLine(bracket);
+            }
         }
     }
 }
