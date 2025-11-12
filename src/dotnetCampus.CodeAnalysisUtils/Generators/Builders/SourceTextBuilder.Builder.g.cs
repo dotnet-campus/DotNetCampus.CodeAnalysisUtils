@@ -366,7 +366,7 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            IsExpression = true,
+            IsPartExpression = true,
             Header = prefix,
             Footer = suffix,
         };
