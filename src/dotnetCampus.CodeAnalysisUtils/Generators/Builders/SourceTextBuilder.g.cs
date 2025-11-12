@@ -585,21 +585,23 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
             }
         }
 
-        var likeExpression =
-            // 父代码块期望内部代码块为表达式时，一定不能换行
+        // 判断最后一个子元素是否应该作为表达式的一部分（不换行）
+        var shouldLastStatementBeExpressionPart =
+            // 父代码块期望当前代码块为表达式的一部分时,传递给最后一个子元素
             expectExpressionPart is true
-            // 当前代码块本身就是表达式时，也不能换行
+            // 当前代码块本身标记为表达式时,也传递给最后一个子元素
             || IsExpression;
-        // Footer 如果非空，且当前代码块不是表达式时，最后一个语句需要换行。
+        // 如果有 Footer,则根据 IsPartExpression 决定最后一个子元素的处理方式
         if (Footer is not null)
         {
-            likeExpression = IsPartExpression;
+            shouldLastStatementBeExpressionPart = IsPartExpression;
         }
+
         if (IsBracketBlock)
         {
-            using (new BracketScope(builder, 1, StartBracket, EndBracket, likeExpression))
+            using (new BracketScope(builder, 1, StartBracket, EndBracket, shouldLastStatementBeExpressionPart))
             {
-                // 大括号内的换行不受父级影响。
+                // 大括号内的子元素都正常换行，不受父级影响
                 for (var i = 0; i < _statements.Count; i++)
                 {
                     _statements[i].BuildInto(builder);
@@ -608,28 +610,29 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
         else
         {
-            // 非最后一个语句不受父级影响。
+            // 非大括号块：除最后一个元素外，其他元素都正常换行
             for (var i = 0; i < _statements.Count - 1; i++)
             {
                 _statements[i].BuildInto(builder);
             }
 
-            // 最后一个语句看情况。
+            // 最后一个元素：如果是 CodeBlockSourceTextBuilder 且需要作为表达式的一部分，则递归传递标志
             if (_statements.Count > 0)
             {
                 var lastStatement = _statements[^1];
-                if (likeExpression && lastStatement is CodeBlockSourceTextBuilder last)
+                if (shouldLastStatementBeExpressionPart && lastStatement is CodeBlockSourceTextBuilder last)
                 {
+                    // 递归告诉最后一个子代码块:你是表达式的一部分,不要在末尾换行
                     last.BuildInto(builder, true);
                 }
                 else
                 {
+                    // 非 CodeBlockSourceTextBuilder 或不需要作为表达式的一部分,正常输出
                     lastStatement.BuildInto(builder);
                 }
             }
         }
 
-        // Footer
         if (Footer is { } footer)
         {
             if (expectExpressionPart is true || IsExpression)
