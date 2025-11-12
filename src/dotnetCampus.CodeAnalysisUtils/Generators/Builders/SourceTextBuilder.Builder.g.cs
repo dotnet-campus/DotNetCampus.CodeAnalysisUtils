@@ -328,7 +328,7 @@ public static class AllowStatementExtensions
     {
         builder.AddNestedSourceCode(new CodeBlockSourceTextBuilder(builder.Root)
         {
-            IsLineSeparator = true,
+            Structure = CodeBlockStructure.LineSeparator,
         });
         return builder;
     }
@@ -345,7 +345,7 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-
+            Structure = CodeBlockStructure.StatementBlock,
         };
         codeBlockBuilder(codeBlock);
         builder.AddNestedSourceCode(codeBlock);
@@ -367,6 +367,7 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
+            Structure = CodeBlockStructure.Expression,
             Header = prefix,
             Footer = suffix,
         };
@@ -390,7 +391,7 @@ public static class AllowStatementExtensions
         {
             var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
             {
-
+                Structure = CodeBlockStructure.StatementBlock,
             };
             codeBlockBuilder(codeBlock, item);
             builder.AddNestedSourceCode(codeBlock);
@@ -490,7 +491,7 @@ public static class AllowStatementExtensions
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            WrapWithBracket = true,
+            Structure = CodeBlockStructure.BracketBlock,
             Header = header,
             StartBracket = startBracket,
             EndBracket = endBracket,

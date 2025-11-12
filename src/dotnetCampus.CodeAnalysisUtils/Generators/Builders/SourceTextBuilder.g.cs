@@ -229,7 +229,7 @@ public class SourceTextBuilder : IDisposable,
             if (topLevelCode is CodeBlockSourceTextBuilder codeBlock)
             {
                 // 顶级语句。
-                var isLineSeparator = codeBlock.IsLineSeparator && i > 0 && i < _topLevelCodes.Count - 1;
+                var isLineSeparator = codeBlock.Structure == CodeBlockStructure.LineSeparator && i > 0 && i < _topLevelCodes.Count - 1;
                 if (isLineSeparator)
                 {
                     builder.AppendLine();
@@ -420,7 +420,10 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// </summary>
     public bool UseExpressionBody { get; init; }
 
-    private CodeBlockSourceTextBuilder MethodBody => _methodBody ??= new CodeBlockSourceTextBuilder(Root) { IsExpression = UseExpressionBody };
+    private CodeBlockSourceTextBuilder MethodBody => _methodBody ??= new CodeBlockSourceTextBuilder(Root)
+    {
+        Structure = UseExpressionBody ? CodeBlockStructure.Expression : CodeBlockStructure.StatementBlock
+    };
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
@@ -445,7 +448,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             attributeListBuilder.BuildInto(builder);
         }
-        
+
         // 写入方法签名。
         if (UseExpressionBody)
         {
@@ -455,7 +458,7 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             builder.AppendLine(Signature);
         }
-        
+
         // 写入泛型约束。
         if (_typeConstraintBuilder is { } typeConstraintBuilder)
         {
@@ -464,13 +467,13 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
                 typeConstraintBuilder.BuildInto(builder);
             }
         }
-        
+
         // 写入方法体。
         if (UseExpressionBody)
         {
             // 表达式主体：直接输出内容，最后加分号。
             MethodBody.BuildInto(builder);
-            builder.TrimEnd().AppendLine(";");
+            builder.AppendLine(";");
         }
         else
         {
@@ -493,60 +496,33 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     private readonly List<IndentSourceTextBuilder> _statements = [];
 
     /// <summary>
-    /// 是否使用大括号包裹代码块。
+    /// 代码块的结构类型。
     /// </summary>
-    internal bool WrapWithBracket { get; init; }
-
-    /// <summary>
-    /// 指示这是否是一个表达式代码块。<br/>
-    /// 如果是，则在代码前后不会换行。
-    /// </summary>
-    public bool IsExpression { get; init; }
+    public required CodeBlockStructure Structure { get; init; }
 
     /// <summary>
     /// 代码块的头部文本。如果不为 <see langword="null"/>，则在代码块开始前添加此文本。<br/>
-    /// 适用于构建 if (xxx), _ => xxx switch 等需要在代码块前添加头部文本的场景。
+    /// 适用于构建 if (xxx), return xxx 等需要在代码块前添加头部文本的场景。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 或 <see cref="IsExpression"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string? Header { get; init; }
 
     /// <summary>
     /// 代码块的尾部文本。如果不为 <see langword="null"/>，则在代码块结束后添加此文本。<br/>
-    /// 适用于构建 }); 等这种大括号后还有尾部文本的场景。
+    /// 适用于构建 }); 或表达式结尾的 ; 等场景。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 或 <see cref="IsExpression"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string? Footer { get; init; }
 
     /// <summary>
-    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
-    /// 适用于构建 => { 等需要在代码块前添加头部文本的场景。
+    /// 自定义起始括号。仅当 <see cref="Structure"/> 为 <see cref="CodeBlockStructure.BracketBlock"/> 时有效。<br/>
+    /// 如果不设置，则使用默认的大括号 "{"。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string StartBracket { get; init; } = "{";
 
     /// <summary>
-    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
-    /// 适用于 }); 等这种大括号后还有尾部文本的场景。
+    /// 自定义结束括号。仅当 <see cref="Structure"/> 为 <see cref="CodeBlockStructure.BracketBlock"/> 时有效。<br/>
+    /// 如果不设置，则使用默认的大括号 "}"。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string EndBracket { get; init; } = "}";
-
-    /// <summary>
-    /// 指示这是否是一个用于分隔上下代码块的空行。<br/>
-    /// 如果是，则在生成代码时会在此代码块前后各添加一个空行。
-    /// </summary>
-    /// <remarks>
-    /// 当为 <see langword="true"/> 时，其他所有属性都无效。
-    /// </remarks>
-    internal bool IsLineSeparator { get; init; }
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
@@ -566,65 +542,145 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
-        // 1. 写入 Header（如果有）。
-        if (Header is { } header)
+        switch (Structure)
         {
-            if (IsExpression)
-            {
-                // 表达式的 Header，不换行。
-                builder.Append(header);
-            }
-            else
-            {
-                // 普通语句的 Header，换行。
-                builder.AppendLine(header);
-            }
-        }
+            case CodeBlockStructure.LineSeparator:
+                // 空行分隔符,不输出任何内容
+                break;
 
-        // 2. 写入代码块内容。
-        if (WrapWithBracket)
-        {
-            // 用大括号包裹。
-            using (new BracketScope(builder, 1, StartBracket, EndBracket))
-            {
-                for (var i = 0; i < _statements.Count; i++)
-                {
-                    var statement = _statements[i];
-                    statement.BuildInto(builder);
-                }
-            }
-        }
-        else
-        {
-            // 不用大括号包裹，直接输出。
-            for (var i = 0; i < _statements.Count; i++)
-            {
-                var statement = _statements[i];
-                statement.BuildInto(builder);
-            }
-        }
+            case CodeBlockStructure.StatementBlock:
+                BuildStatementBlock(builder);
+                break;
 
-        // 3. 表达式需要去除尾随空白。
-        if (IsExpression)
-        {
-            builder.TrimEnd();
-        }
+            case CodeBlockStructure.BracketBlock:
+                BuildBracketBlock(builder);
+                break;
 
-        // 4. 写入 Footer（如果有）。
-        if (Footer is { } footer)
-        {
-            if (IsExpression)
-            {
-                // 表达式的 Footer，不换行。
-                builder.Append(footer);
-            }
-            else
-            {
-                // 普通语句的 Footer，换行。
-                builder.AppendLine(footer);
-            }
+            case CodeBlockStructure.Expression:
+                BuildExpression(builder);
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
+
+    private void BuildStatementBlock(IndentedStringBuilder builder)
+    {
+        // Header 换行
+        if (Header is { } header)
+        {
+            builder.AppendLine(header);
+        }
+
+        // 内部语句正常输出
+        for (var i = 0; i < _statements.Count; i++)
+        {
+            _statements[i].BuildInto(builder);
+        }
+
+        // Footer 换行
+        if (Footer is { } footer)
+        {
+            builder.AppendLine(footer);
+        }
+    }
+
+    private void BuildBracketBlock(IndentedStringBuilder builder)
+    {
+        // Header 换行
+        if (Header is { } header)
+        {
+            builder.AppendLine(header);
+        }
+
+        // 用大括号包裹,内部语句正常输出
+        using (new BracketScope(builder, 1, StartBracket, EndBracket))
+        {
+            for (var i = 0; i < _statements.Count; i++)
+            {
+                _statements[i].BuildInto(builder);
+            }
+        }
+
+        // Footer 换行
+        if (Footer is { } footer)
+        {
+            builder.AppendLine(footer);
+        }
+    }
+
+    private void BuildExpression(IndentedStringBuilder builder)
+    {
+        // Header 不换行追加
+        if (Header is { } header)
+        {
+            builder.Append(header);
+        }
+
+        // 内部语句正常输出(保持换行)
+        for (var i = 0; i < _statements.Count; i++)
+        {
+            _statements[i].BuildInto(builder);
+        }
+
+        // Footer 紧跟最后内容,不换行追加
+        if (Footer is { } footer)
+        {
+            builder.Append(footer);
+        }
+    }
+}
+
+/// <summary>
+/// 指定 <see cref="CodeBlockSourceTextBuilder"/> 所生成的代码的结构类型。
+/// </summary>
+public enum CodeBlockStructure
+{
+    /// <summary>
+    /// 默认的语句块。每个子语句独占一行,整个块作为一个完整的语句单元。
+    /// <code>
+    /// statement1;
+    /// statement2;
+    /// </code>
+    /// Header 和 Footer 都会换行(如果有),内部语句正常换行。
+    /// </summary>
+    StatementBlock,
+
+    /// <summary>
+    /// 用大括号(或其他类似括号的结构)包裹的代码块。
+    /// <code>
+    /// if (condition)
+    /// {
+    ///     statement1;
+    ///     statement2;
+    /// }
+    /// </code>
+    /// Header 换行后开始大括号块,内部语句正常换行,代码块结束后换行再写 Footer。
+    /// </summary>
+    BracketBlock,
+
+    /// <summary>
+    /// 表达式块。Header 和 Footer 与内容在同一逻辑行上,但内部语句仍然正常换行。
+    /// <code>
+    /// return new Xxx
+    /// {
+    ///     Prop1 = value1,
+    ///     Prop2 = value2,
+    /// };
+    /// </code>
+    /// Header 不换行追加,内部语句正常换行,Footer 紧跟最后内容(通过 TrimEnd)不换行追加。
+    /// </summary>
+    Expression,
+
+    /// <summary>
+    /// 用于分隔上下代码块的空行分隔符。
+    /// <code>
+    ///
+    /// </code>
+    /// Header, Footer 以及代码块内容都无效,仅输出一个空行。
+    /// </summary>
+    LineSeparator,
 }
 
 /// <summary>
