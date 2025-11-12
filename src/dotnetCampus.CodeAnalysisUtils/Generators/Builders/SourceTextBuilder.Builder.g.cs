@@ -334,6 +334,71 @@ public static class AllowStatementExtensions
     }
 
     /// <summary>
+    /// 为此方法声明添加一个语句块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="codeBlockBuilder">语句块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatement<TBuilder>(this TBuilder builder,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+
+        };
+        codeBlockBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加一个语句块，语句块由前缀、表达式主体、后缀组成。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="prefix">表达式主体前缀，例如 return 等。</param>
+    /// <param name="suffix">表达式主体后缀，例如 ; 等。</param>
+    /// <param name="expressionBuilder">表达式主体构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatement<TBuilder>(this TBuilder builder,
+        string? prefix, string? suffix,
+        Action<CodeBlockSourceTextBuilder> expressionBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+            Header = prefix,
+            Footer = suffix,
+        };
+        expressionBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加多个语句块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="items">用于生成多个方法声明的数据源。</param>
+    /// <param name="codeBlockBuilder">语句块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatements<TBuilder, TItem>(this TBuilder builder, IEnumerable<TItem> items,
+        Action<CodeBlockSourceTextBuilder, TItem> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        foreach (var item in items)
+        {
+            var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+            {
+
+            };
+            codeBlockBuilder(codeBlock, item);
+            builder.AddNestedSourceCode(codeBlock);
+        }
+        return builder;
+    }
+
+    /// <summary>
     /// 为此方法声明添加一个原始语句。
     /// </summary>
     /// <param name="builder">辅助链式调用。</param>
