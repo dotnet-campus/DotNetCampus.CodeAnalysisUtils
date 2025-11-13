@@ -174,7 +174,7 @@ public class SourceTextBuilder : IDisposable,
                 NullableAnnotationContext.Enable => "enable",
                 NullableAnnotationContext.Warnings => "warnings",
                 NullableAnnotationContext.Annotations => "annotations",
-                _ => throw new ArgumentOutOfRangeException(),
+                _ => throw new ArgumentOutOfRangeException(nameof(nullable), nullable, "Unsupported NullableAnnotationContext value"),
             }}");
         }
 
@@ -569,7 +569,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     {
         if (IsLineSeparator)
         {
-            // 空行分隔符,不输出任何内容
+            // 空行分隔符，不输出任何内容
             return;
         }
 
@@ -586,16 +586,12 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
         }
 
         // 判断最后一个子元素是否应该作为表达式的一部分（不换行）
-        var shouldLastStatementBeExpressionPart =
-            // 父代码块期望当前代码块为表达式的一部分时,传递给最后一个子元素
-            expectExpressionPart is true
-            // 当前代码块本身标记为表达式时,也传递给最后一个子元素
-            || IsExpression;
-        // 如果有 Footer,则根据 IsPartExpression 决定最后一个子元素的处理方式
-        if (Footer is not null)
-        {
-            shouldLastStatementBeExpressionPart = IsPartExpression;
-        }
+        var shouldLastStatementBeExpressionPart = Footer is not null
+            // 如果有 Footer，则根据 IsPartExpression 决定最后一个子元素的处理方式
+            ? IsPartExpression
+            // 父代码块期望当前代码块为表达式的一部分时，传递给最后一个子元素
+            // 当前代码块本身标记为表达式时，也传递给最后一个子元素
+            : (expectExpressionPart is true || IsExpression);
 
         if (IsBracketBlock)
         {
@@ -622,12 +618,12 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
                 var lastStatement = _statements[^1];
                 if (shouldLastStatementBeExpressionPart && lastStatement is CodeBlockSourceTextBuilder last)
                 {
-                    // 递归告诉最后一个子代码块:你是表达式的一部分,不要在末尾换行
+                    // 递归告诉最后一个子代码块：你是表达式的一部分，不要在末尾换行
                     last.BuildInto(builder, true);
                 }
                 else
                 {
-                    // 非 CodeBlockSourceTextBuilder 或不需要作为表达式的一部分,正常输出
+                    // 非 CodeBlockSourceTextBuilder 或不需要作为表达式的一部分，正常输出
                     lastStatement.BuildInto(builder);
                 }
             }
@@ -649,7 +645,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <summary>
     /// 转换为可在调试器中查看的信息。
     /// </summary>
-    /// <returns></returns>
+    /// <returns>调试器中查看的信息。</returns>
     public override string ToString()
     {
         return $"{Header}+{_statements.Count}+{Footer}";

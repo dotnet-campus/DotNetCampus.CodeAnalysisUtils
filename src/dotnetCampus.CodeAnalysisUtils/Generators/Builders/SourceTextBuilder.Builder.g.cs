@@ -229,11 +229,11 @@ public static class AllowMemberDeclarationExtensions
     /// 为此类型声明添加方法成员。
     /// </summary>
     /// <param name="builder">辅助链式调用。</param>
-    /// <param name="useExpressionBody">是否使用表达式主体。</param>
     /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
+    /// <param name="useExpressionBody">是否使用表达式主体。</param>
     /// <param name="methodDeclarationAndExpressionBodyBuilder">方法声明和表达式主体的构建器。</param>
     /// <returns>辅助链式调用。</returns>
-    public static TBuilder AddMethodDeclaration<TBuilder>(this TBuilder builder, bool useExpressionBody, string signature,
+    public static TBuilder AddMethodDeclaration<TBuilder>(this TBuilder builder, string signature, bool useExpressionBody,
         Action<MethodDeclarationSourceTextBuilder> methodDeclarationAndExpressionBodyBuilder)
         where TBuilder : IAllowMemberDeclaration
     {
@@ -517,7 +517,7 @@ public static class AllowStatementExtensions
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
             IsBracketBlock = true,
-            IsExpression = true,
+            IsExpression = isExpressionBody,
             Header = header,
             StartBracket = startBracket,
             EndBracket = endBracket,
