@@ -283,10 +283,10 @@ public class IndentedStringBuilder
         var trimmedLength = GetTrimmedLength(_builder);
 
         // 在去除空白后的内容中，从后向前查找最后一个换行符。
-        var lastNewLineIndex = FindLastNewLineIndex(_builder, trimmedLength, NewLine[^1]);
+        var lastNewLineIndex = FindLastNewLineIndex(_builder, trimmedLength, NewLine);
 
         // 计算最后一行的起始位置（换行符之后，或者从 0 开始）。
-        var lastLineStart = lastNewLineIndex >= 0 ? lastNewLineIndex + 1 : 0;
+        var lastLineStart = lastNewLineIndex >= 0 ? lastNewLineIndex + NewLine.Length : 0;
 
         // 跳过行首的缩进空格，找到实际内容的起始位置。
         var contentStart = SkipLeadingSpaces(_builder, lastLineStart, trimmedLength);
@@ -295,7 +295,7 @@ public class IndentedStringBuilder
         MoveRangeToTarget(_builder, _lineBuffer, contentStart, trimmedLength);
 
         // _builder 保留到换行符（包含换行符），如果没有换行符则清空。
-        _builder.Length = lastNewLineIndex >= 0 ? lastNewLineIndex + 1 : 0;
+        _builder.Length = lastNewLineIndex >= 0 ? lastNewLineIndex + NewLine.Length : 0;
 
         return this;
 
@@ -316,11 +316,21 @@ public class IndentedStringBuilder
             return length;
         }
 
-        static int FindLastNewLineIndex(StringBuilder builder, int endIndex, char newLine)
+        static int FindLastNewLineIndex(StringBuilder builder, int endIndex, string newLine)
         {
-            for (var i = endIndex - 1; i >= 0; i--)
+            var newLineLength = newLine.Length;
+            for (var i = endIndex - newLineLength; i >= 0; i--)
             {
-                if (builder[i] == newLine)
+                var isMatch = true;
+                for (var j = 0; j < newLineLength; j++)
+                {
+                    if (builder[i + j] != newLine[j])
+                    {
+                        isMatch = false;
+                        break;
+                    }
+                }
+                if (isMatch)
                 {
                     return i;
                 }
