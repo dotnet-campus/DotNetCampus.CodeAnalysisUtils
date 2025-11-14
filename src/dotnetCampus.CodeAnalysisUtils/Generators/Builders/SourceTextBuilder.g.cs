@@ -598,10 +598,9 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
 
         // 判断最后一个子元素是否应该作为表达式的一部分（不换行）
         var shouldLastStatementBeExpressionPart = Footer is not null
-            // 如果有 Footer，则根据 IsPartExpression 决定最后一个子元素的处理方式
+            // 有 Footer 时，只有 IsPartExpression 为 true 才作为表达式一部分
             ? IsPartExpression
-            // 父代码块期望当前代码块为表达式的一部分时，传递给最后一个子元素
-            // 当前代码块本身标记为表达式时，也传递给最后一个子元素
+            // 没有 Footer 时，父代码块期望当前代码块为表达式的一部分，或当前代码块本身标记为表达式时，也传递给最后一个子元素
             : (expectExpressionPart is true || IsExpression);
 
         if (IsBracketBlock)
@@ -659,9 +658,9 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     }
 
     /// <summary>
-    /// 转换为可在调试器中查看的信息。
+    /// 返回用于调试的对象状态信息，仅供调试器或日志查看使用。
     /// </summary>
-    /// <returns>调试器中查看的信息。</returns>
+    /// <returns>表示当前对象状态的调试信息字符串。</returns>
     public override string ToString()
     {
         return $"{Header ?? "<NO_HEADER>"}+{_statements.Count}+{Footer ?? "<NO_FOOTER>"}";
@@ -908,22 +907,26 @@ public class TypeConstraintsSourceTextBuilder(SourceTextBuilder root) : IndentSo
 public enum NullableAnnotationContext
 {
     /// <summary>
-    /// The code is nullable-oblivious. Disable matches the behavior before nullable reference types were enabled, except the new syntax produces warnings instead of errors.
+    /// 代码为可空忽略状态。禁用时的行为与启用可空引用类型之前一致，但新语法会产生警告而不是错误。
+    /// <para>The code is nullable-oblivious. Disable matches the behavior before nullable reference types were enabled, except the new syntax produces warnings instead of errors.</para>
     /// </summary>
     Disable,
 
     /// <summary>
-    /// The compiler enables all null reference analysis and all language features.
+    /// 编译器启用所有空引用分析和所有语言特性。
+    /// <para>The compiler enables all null reference analysis and all language features.</para>
     /// </summary>
     Enable,
 
     /// <summary>
-    /// The compiler performs all null analysis and emits warnings when code might dereference null.
+    /// 编译器执行所有空引用分析，并在代码可能解引用 null 时发出警告。
+    /// <para>The compiler performs all null analysis and emits warnings when code might dereference null.</para>
     /// </summary>
     Warnings,
 
     /// <summary>
-    /// The compiler doesn't emit warnings when code might dereference null, or when you assign a maybe-null expression to a non-nullable variable.
+    /// 编译器不会在代码可能解引用 null 或将可能为 null 的表达式赋值给非可空变量时发出警告。
+    /// <para>The compiler doesn't emit warnings when code might dereference null, or when you assign a maybe-null expression to a non-nullable variable.</para>
     /// </summary>
     Annotations,
 }
