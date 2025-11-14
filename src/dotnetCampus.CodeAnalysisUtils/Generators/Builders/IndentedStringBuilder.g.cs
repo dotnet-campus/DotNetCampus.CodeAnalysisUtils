@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Text;
 
 namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
@@ -365,18 +366,14 @@ public class IndentedStringBuilder
         // 如果 _lineBuffer 中有内容，需要先将其写入 _builder。
         if (_lineBuffer.Length > 0)
         {
-            // 临时将 _lineBuffer 的内容写入，但不清空 _lineBuffer。
-            var tempBuilder = new StringBuilder(_builder.Length + Indentation.Length * IndentLevel + _lineBuffer.Length);
-            tempBuilder.Append(_builder);
-
-            // 应用缩进并写入 _lineBuffer 的内容。
+            string[] parts = new string[2 + IndentLevel];
+            parts[0] = _builder.ToString();
             for (var i = 0; i < IndentLevel; i++)
             {
-                tempBuilder.Append(Indentation);
+                parts[i + 1] = Indentation;
             }
-            tempBuilder.Append(_lineBuffer);
-
-            return tempBuilder.ToString();
+            parts[^1] = _lineBuffer.ToString();
+            return string.Concat(parts);
         }
 
         return _builder.ToString();
