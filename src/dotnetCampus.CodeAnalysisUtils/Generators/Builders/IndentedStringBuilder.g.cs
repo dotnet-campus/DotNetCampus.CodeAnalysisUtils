@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Linq;
 using System.Text;
 
 namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
@@ -132,12 +131,19 @@ public class IndentedStringBuilder
     /// </summary>
     /// <param name="rawText">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
+    /// <remarks>
+    /// 请注意：非常建议在添加原始字符串之前，确保此前字符串的末尾存在换行符或最近一次添加是按行添加；
+    /// 否则可能会破坏最终字符串的正确性，尤其是正确的缩进。
+    /// </remarks>
     public IndentedStringBuilder AppendRaw(string rawText)
     {
         if (_lineBuffer.Length > 0)
         {
             // 在添加原始字符串之前，立即把行缓冲区的内容写入。
-            FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
+            FinalAppendLine(_lineBuffer.ToString().AsSpan(),
+                // 请注意：此参数传入 false 会破坏最终字符串末尾必然有换行符的设定；
+                // 但 Raw 相关方法本身设计上就是提供原始功能，但并不安全，需要业务开发者自行评估风险并修复问题。
+                false);
             _lineBuffer.Clear();
         }
 
