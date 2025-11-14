@@ -455,13 +455,13 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
             {
                 // 写入方法签名。
                 builder.AppendLine(Signature);
-                // 写入泛型约束。
                 using (builder.IndentIn())
                 {
+                    // 写入泛型约束。
                     typeConstraintBuilder.BuildInto(builder);
+                    // 写入表达式主体箭头。
+                    builder.Append("=> ");
                 }
-                // 写入表达式主体箭头。
-                builder.Append(" => ");
             }
             else
             {
