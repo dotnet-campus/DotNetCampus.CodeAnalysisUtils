@@ -449,22 +449,38 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
             attributeListBuilder.BuildInto(builder);
         }
 
-        // 写入方法签名。
         if (UseExpressionBody)
         {
-            builder.Append(Signature).Append(" => ");
+            if (_typeConstraintBuilder is { } typeConstraintBuilder)
+            {
+                // 写入方法签名。
+                builder.AppendLine(Signature);
+                // 写入泛型约束。
+                using (builder.IndentIn())
+                {
+                    typeConstraintBuilder.BuildInto(builder);
+                }
+                // 写入表达式主体箭头。
+                builder.Append(" => ");
+            }
+            else
+            {
+                // 写入方法签名和表达式主体箭头。
+                builder.Append(Signature).Append(" => ");
+            }
         }
         else
         {
+            // 写入方法签名。
             builder.AppendLine(Signature);
-        }
 
-        // 写入泛型约束。
-        if (_typeConstraintBuilder is { } typeConstraintBuilder)
-        {
-            using (builder.IndentIn())
+            // 写入泛型约束。
+            if (_typeConstraintBuilder is { } typeConstraintBuilder)
             {
-                typeConstraintBuilder.BuildInto(builder);
+                using (builder.IndentIn())
+                {
+                    typeConstraintBuilder.BuildInto(builder);
+                }
             }
         }
 
@@ -653,7 +669,7 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <returns>调试器中查看的信息。</returns>
     public override string ToString()
     {
-        return $"{Header}+{_statements.Count}+{Footer}";
+        return $"{Header ?? "<NO_HEADER>"}+{_statements.Count}+{Footer ?? "<NO_FOOTER>"}";
     }
 }
 
