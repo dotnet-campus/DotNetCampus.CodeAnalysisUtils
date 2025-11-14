@@ -455,18 +455,26 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
             {
                 // 写入方法签名。
                 builder.AppendLine(Signature);
+                // 写入泛型约束。
+                typeConstraintBuilder.BuildInto(builder);
                 using (builder.IndentIn())
                 {
-                    // 写入泛型约束。
-                    typeConstraintBuilder.BuildInto(builder);
                     // 写入表达式主体箭头。
                     builder.Append("=> ");
+
+                    // 表达式主体：直接输出内容，最后加分号。
+                    MethodBody.BuildInto(builder);
+                    builder.AppendLine(";");
                 }
             }
             else
             {
                 // 写入方法签名和表达式主体箭头。
                 builder.Append(Signature).Append(" => ");
+
+                // 表达式主体：直接输出内容，最后加分号。
+                MethodBody.BuildInto(builder);
+                builder.AppendLine(";");
             }
         }
         else
@@ -477,23 +485,10 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
             // 写入泛型约束。
             if (_typeConstraintBuilder is { } typeConstraintBuilder)
             {
-                using (builder.IndentIn())
-                {
-                    typeConstraintBuilder.BuildInto(builder);
-                }
+                typeConstraintBuilder.BuildInto(builder);
             }
-        }
 
-        // 写入方法体。
-        if (UseExpressionBody)
-        {
-            // 表达式主体：直接输出内容，最后加分号。
-            MethodBody.BuildInto(builder);
-            builder.AppendLine(";");
-        }
-        else
-        {
-            // 普通方法体：用大括号包裹。
+            // 用大括号包裹方法体。
             using (new BracketScope(builder))
             {
                 MethodBody.BuildInto(builder);
