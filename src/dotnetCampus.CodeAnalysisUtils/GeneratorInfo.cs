@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System.Reflection;
+﻿using System.Reflection;
 using DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 using Microsoft.CodeAnalysis;
 
