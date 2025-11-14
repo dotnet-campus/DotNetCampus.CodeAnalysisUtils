@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Text;
 
@@ -52,7 +51,7 @@ public class IndentedStringBuilder
     /// </summary>
     /// <param name="text">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder Append(string text) => AppendCore(text.AsSpan(), false);
+    public IndentedStringBuilder Append(string text) => AppendMultilineText(text.AsSpan(), false);
 
     /// <summary>
     /// 添加文本，不添加换行符。使用指定的行处理器处理本次添加的文本。
@@ -81,20 +80,20 @@ public class IndentedStringBuilder
     /// </summary>
     /// <param name="text">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder Append(ReadOnlySpan<char> text) => AppendCore(text, false);
+    public IndentedStringBuilder Append(ReadOnlySpan<char> text) => AppendMultilineText(text, false);
 
     /// <summary>
     /// 添加换行符。
     /// </summary>
     /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine() => AppendCore([], true);
+    public IndentedStringBuilder AppendLine() => AppendMultilineText([], true);
 
     /// <summary>
     /// 添加文本，并继续添加换行符。
     /// </summary>
     /// <param name="text">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine(string text) => AppendCore(text.AsSpan(), true);
+    public IndentedStringBuilder AppendLine(string text) => AppendMultilineText(text.AsSpan(), true);
 
     /// <summary>
     /// 添加文本，并继续添加换行符。
@@ -123,7 +122,7 @@ public class IndentedStringBuilder
     /// </summary>
     /// <param name="text">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
-    public IndentedStringBuilder AppendLine(ReadOnlySpan<char> text) => AppendCore(text, true);
+    public IndentedStringBuilder AppendLine(ReadOnlySpan<char> text) => AppendMultilineText(text, true);
 
     /// <summary>
     /// 直接添加原始字符串，不进行任何处理（不考虑缩进，也不处理换行符）。<br/>
@@ -131,12 +130,20 @@ public class IndentedStringBuilder
     /// </summary>
     /// <param name="rawText">要写入的文本。</param>
     /// <returns>辅助链式调用。</returns>
+    /// <remarks>
+    /// 请注意：非常建议在添加原始字符串之前，确保此前字符串的末尾存在换行符或最近一次添加是按行添加；
+    /// 否则可能会破坏最终字符串的正确性，尤其是正确的缩进。
+    /// </remarks>
     public IndentedStringBuilder AppendRaw(string rawText)
     {
         if (_lineBuffer.Length > 0)
         {
             // 在添加原始字符串之前，立即把行缓冲区的内容写入。
-            AppendLine(_lineBuffer.ToString());
+            FinalAppendLine(_lineBuffer.ToString().AsSpan(),
+                // 请注意：此参数传入 false 会破坏最终字符串末尾必然有换行符的设定；
+                // 但 Raw 相关方法本身设计上就是提供原始功能，但并不安全，需要业务开发者自行评估风险并修复问题。
+                false);
+            _lineBuffer.Clear();
         }
 
         // 直接添加原始字符串，不进行任何处理。
@@ -157,22 +164,15 @@ public class IndentedStringBuilder
         return this;
     }
 
-    private IndentedStringBuilder AppendCore(ReadOnlySpan<char> text, bool newLine)
-    {
-        return (_lineBuffer.Length is 0, newLine) switch
-        {
-            // 正准备写入完整的一行。
-            (true, true) => AppendNewLine(text),
-            // 正在写入一行的开头。
-            (true, false) => AppendLineStart(text),
-            // 在行前有内容的情况下，写入本行剩余部分。
-            (false, true) => AppendLineEnd(text),
-            // 写入一行的中间部分。
-            (false, false) => AppendLineMiddle(text),
-        };
-    }
-
-    private IndentedStringBuilder AppendNewLine(ReadOnlySpan<char> text)
+    /// <summary>
+    /// 视参数 <paramref name="text"/> 为单行或多行文本。<br/>
+    /// 如果为单行不包含换行符的文本，则将其写入到字符串缓冲区中；<br/>
+    /// 如果为包含换行符的文本，则将最后一个换行符之前的所有行写入到最终字符串中，将剩余部分保留在行缓冲区，以便后续继续写入。<br/>
+    /// </summary>
+    /// <param name="text">要写入的文本。</param>
+    /// <param name="appendFinalNewLine">是否在最后添加换行符。</param>
+    /// <returns>辅助链式调用。</returns>
+    private IndentedStringBuilder AppendMultilineText(ReadOnlySpan<char> text, bool appendFinalNewLine)
     {
         var leftPart = text;
         while (leftPart.Length > 0)
@@ -180,8 +180,18 @@ public class IndentedStringBuilder
             var newLineIndex = leftPart.IndexOf('\n');
             if (newLineIndex < 0)
             {
-                // 剩余部分已经没有换行符了，直接写入。
-                AppendInline(leftPart);
+                // 剩余部分已经没有换行符了
+                if (appendFinalNewLine)
+                {
+                    // 直接写入到最终字符串中
+                    FlushAndFinalAppendLine(leftPart);
+                    return this;
+                }
+                else
+                {
+                    // 写入到行缓冲区中
+                    _lineBuffer.Append(leftPart);
+                }
                 break;
             }
 
@@ -189,41 +199,53 @@ public class IndentedStringBuilder
             var line = leftPart[..newLineIndex].TrimEnd('\r');
             leftPart = leftPart[(newLineIndex + 1)..];
 
-            AppendInline(line);
-            _builder.Append(NewLine);
+            FlushAndFinalAppendLine(line);
         }
-        // 最后一个换行符。
-        _builder.Append(NewLine);
-        return this;
-    }
-
-    private IndentedStringBuilder AppendLineStart(ReadOnlySpan<char> text)
-    {
-        _lineBuffer.Append(text);
-        return this;
-    }
-
-    private IndentedStringBuilder AppendLineEnd(ReadOnlySpan<char> text)
-    {
-        _lineBuffer.Append(text);
-        var line = _lineBuffer.ToString();
-        _lineBuffer.Clear();
-        AppendNewLine(line.AsSpan());
-        return this;
-    }
-
-    private IndentedStringBuilder AppendLineMiddle(ReadOnlySpan<char> text)
-    {
-        _lineBuffer.Append(text.ToString());
+        // 如果传入的文本 text 以换行符结尾，上述循环则没有提前退出，此时需要再补一个换行符。
+        if (appendFinalNewLine)
+        {
+            FlushAndFinalAppendLine([]);
+        }
         return this;
     }
 
     /// <summary>
-    /// 视参数 <paramref name="line"/> 为单行文本（不包含换行符），并将其写入。考虑缩进，但不添加换行符。
+    /// 如果行缓冲区中存在内容，则将其与 <paramref name="text"/> 的内容一起拼成完整的一行，写入到最终字符串中。考虑缩进，并在末尾添加换行符。<br/>
+    /// 如果缓冲区为空，则直接将 <paramref name="text"/> 视为完整的一行，写入到最终字符串中。
+    /// </summary>
+    /// <returns>辅助链式调用。</returns>
+    private IndentedStringBuilder FlushAndFinalAppendLine(ReadOnlySpan<char> text)
+    {
+        if (_lineBuffer.Length > 0)
+        {
+            // 因为我们存在行处理程序，所以必须生成完整的一行文本，不能分次处理。
+            var totalLength = _lineBuffer.Length + text.Length;
+            Span<char> line = totalLength <= 256
+                ? stackalloc char[totalLength]
+                : new char[totalLength];
+            _lineBuffer.CopyTo(0, line, _lineBuffer.Length);
+            text.CopyTo(line.Slice(_lineBuffer.Length));
+            _lineBuffer.Clear();
+            return FinalAppendLine(line);
+        }
+        else
+        {
+            return FinalAppendLine(text);
+        }
+    }
+
+    /// <summary>
+    /// 视参数 <paramref name="line"/> 为完整的单行文本（不包含换行符），并将其写入到最终字符串中。考虑缩进，且在末尾添加换行符。
     /// </summary>
     /// <param name="line">单行文本。</param>
+    /// <param name="appendNewLine">
+    /// 是否在末尾添加换行符。<br/>
+    /// 为了确保 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），一般都应该传入 <see langword="true"/>；除非允许破坏这种设定。<br/>
+    /// <see cref="ToString"/> 只用来输出，随后就会还原更改，所以虽然传入了 <see langword="false"/>，但不会破坏这种设定。<br/>
+    /// AppendRaw 系列方法会破坏这种设定，但它们设计如此，需要业务开发者自行评估风险并修复问题。
+    /// </param>
     /// <returns>辅助链式调用。</returns>
-    private IndentedStringBuilder AppendInline(ReadOnlySpan<char> line)
+    private IndentedStringBuilder FinalAppendLine(ReadOnlySpan<char> line, bool appendNewLine = true)
     {
         var result = ProcessLine(line);
         if (result.Type is IndentLineType.NormalLine)
@@ -243,6 +265,10 @@ public class IndentedStringBuilder
         else
         {
             throw new InvalidOperationException($"未知的行处理结果：{result}");
+        }
+        if (appendNewLine)
+        {
+            _builder.Append(NewLine);
         }
         return this;
     }
@@ -266,20 +292,94 @@ public class IndentedStringBuilder
     /// <returns>辅助链式调用。</returns>
     public IndentedStringBuilder TrimEnd()
     {
-        var newLength = _builder.Length;
-        for (var i = _builder.Length - 1; i >= 0; i--)
+        // 如果 _lineBuffer 中存在内容，去除其尾随空白。
+        if (_lineBuffer.Length > 0)
         {
-            if (char.IsWhiteSpace(_builder[i]))
+            _lineBuffer.Length = GetTrimmedLength(_lineBuffer);
+            return this;
+        }
+
+        // 如果 _builder 为空，无需处理。
+        if (_builder.Length == 0)
+        {
+            return this;
+        }
+
+        // 去除 _builder 末尾的所有空白字符后的长度。
+        var trimmedLength = GetTrimmedLength(_builder);
+
+        // 在去除空白后的内容中，从后向前查找最后一个换行符。
+        var lastNewLineIndex = FindLastNewLineIndex(_builder, trimmedLength, NewLine);
+
+        // 计算最后一行的起始位置（换行符之后，或者从 0 开始）。
+        var lastLineStart = lastNewLineIndex >= 0 ? lastNewLineIndex + NewLine.Length : 0;
+
+        // 跳过行首的缩进空格，找到实际内容的起始位置。
+        var contentStart = SkipLeadingSpaces(_builder, lastLineStart, trimmedLength);
+
+        // 将去除缩进后的内容移到 _lineBuffer。
+        MoveRangeToTarget(_builder, _lineBuffer, contentStart, trimmedLength);
+
+        // _builder 保留到换行符（包含换行符），如果没有换行符则清空。
+        _builder.Length = lastNewLineIndex >= 0 ? lastNewLineIndex + NewLine.Length : 0;
+
+        return this;
+
+        static int GetTrimmedLength(StringBuilder builder)
+        {
+            var length = builder.Length;
+            for (var i = builder.Length - 1; i >= 0; i--)
             {
-                newLength--;
+                if (char.IsWhiteSpace(builder[i]))
+                {
+                    length--;
+                }
+                else
+                {
+                    break;
+                }
             }
-            else
+            return length;
+        }
+
+        static int FindLastNewLineIndex(StringBuilder builder, int endIndex, string newLine)
+        {
+            var newLineLength = newLine.Length;
+            for (var i = endIndex - newLineLength; i >= 0; i--)
             {
-                break;
+                var isMatch = true;
+                for (var j = 0; j < newLineLength; j++)
+                {
+                    if (builder[i + j] != newLine[j])
+                    {
+                        isMatch = false;
+                        break;
+                    }
+                }
+                if (isMatch)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        static int SkipLeadingSpaces(StringBuilder builder, int start, int end)
+        {
+            while (start < end && builder[start] == ' ')
+            {
+                start++;
+            }
+            return start;
+        }
+
+        static void MoveRangeToTarget(StringBuilder source, StringBuilder target, int start, int end)
+        {
+            for (var i = start; i < end; i++)
+            {
+                target.Append(source[i]);
             }
         }
-        _builder.Length = newLength;
-        return this;
     }
 
     /// <summary>
@@ -288,7 +388,11 @@ public class IndentedStringBuilder
     /// <returns>当前构建的字符串。</returns>
     public override string ToString()
     {
-        return _builder.ToString();
+        var oldLength = _builder.Length;
+        FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
+        var finalText = _builder.ToString();
+        _builder.Length = oldLength;
+        return finalText;
     }
 
     /// <summary>
@@ -404,6 +508,15 @@ file static class Extensions
         foreach (var c in value)
         {
             builder.Append(c);
+        }
+        return builder;
+    }
+
+    public static StringBuilder CopyTo(this StringBuilder builder, int sourceIndex, Span<char> value, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            value[i] = builder[sourceIndex + i];
         }
         return builder;
     }

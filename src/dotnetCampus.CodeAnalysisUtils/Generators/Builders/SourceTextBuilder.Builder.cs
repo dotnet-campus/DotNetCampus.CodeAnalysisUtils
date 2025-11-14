@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -56,7 +55,7 @@ public interface IAllowMethodDeclaration : IAllowNestedSourceTextBuilder;
 /// <summary>
 /// 指示该源代码构建器支持在内部放入「语句」。
 /// </summary>
-public interface IAllowStatements : IAllowNestedSourceTextBuilder;
+public interface IAllowStatement : IAllowNestedSourceTextBuilder;
 
 /// <summary>
 /// 指示该源代码构建器支持在内部放入「XML 文档注释」。
@@ -229,6 +228,27 @@ public static class AllowMemberDeclarationExtensions
     /// 为此类型声明添加方法成员。
     /// </summary>
     /// <param name="builder">辅助链式调用。</param>
+    /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
+    /// <param name="useExpressionBody">是否使用表达式主体。</param>
+    /// <param name="methodDeclarationAndExpressionBodyBuilder">方法声明和表达式主体的构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddMethodDeclaration<TBuilder>(this TBuilder builder, string signature, bool useExpressionBody,
+        Action<MethodDeclarationSourceTextBuilder> methodDeclarationAndExpressionBodyBuilder)
+        where TBuilder : IAllowMemberDeclaration
+    {
+        var methodDeclaration = new MethodDeclarationSourceTextBuilder(builder.Root, signature)
+        {
+            UseExpressionBody = useExpressionBody,
+        };
+        methodDeclarationAndExpressionBodyBuilder(methodDeclaration);
+        builder.AddNestedSourceCode(methodDeclaration);
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此类型声明添加方法成员。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
     /// <param name="items">用于生成多个方法声明的数据源。</param>
     /// <param name="signatureConverter">方法签名行（如 "public void MyMethod()"）。</param>
     /// <param name="methodDeclarationBuilder">方法声明构建器。</param>
@@ -290,9 +310,9 @@ public static class AllowMemberDeclarationExtensions
 }
 
 /// <summary>
-/// 提供 <see cref="IAllowStatements"/> 的扩展方法。
+/// 提供 <see cref="IAllowStatement"/> 的扩展方法。
 /// </summary>
-public static class AllowStatementsExtensions
+public static class AllowStatementExtensions
 {
     /// <summary>
     /// 添加一个空行以分隔上下代码块。
@@ -303,12 +323,76 @@ public static class AllowStatementsExtensions
     /// </param>
     /// <returns>辅助链式调用。</returns>
     public static TBuilder AddLineSeparator<TBuilder>(this TBuilder builder, bool force = false)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         builder.AddNestedSourceCode(new CodeBlockSourceTextBuilder(builder.Root)
         {
             IsLineSeparator = true,
         });
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加一个语句块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="codeBlockBuilder">语句块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatement<TBuilder>(this TBuilder builder,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+        };
+        codeBlockBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加一个语句块，语句块由前缀、表达式主体、后缀组成。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="prefix">表达式主体前缀，例如 return 等。</param>
+    /// <param name="suffix">表达式主体后缀，例如 ; 等。</param>
+    /// <param name="expressionBuilder">表达式主体构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatement<TBuilder>(this TBuilder builder,
+        string? prefix, string? suffix,
+        Action<CodeBlockSourceTextBuilder> expressionBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+            IsPartExpression = true,
+            Header = prefix,
+            Footer = suffix,
+        };
+        expressionBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 为此方法声明添加多个语句块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="items">用于生成多个方法声明的数据源。</param>
+    /// <param name="codeBlockBuilder">语句块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddStatements<TBuilder, TItem>(this TBuilder builder, IEnumerable<TItem> items,
+        Action<CodeBlockSourceTextBuilder, TItem> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        foreach (var item in items)
+        {
+            var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+            {
+            };
+            codeBlockBuilder(codeBlock, item);
+            builder.AddNestedSourceCode(codeBlock);
+        }
         return builder;
     }
 
@@ -320,7 +404,7 @@ public static class AllowStatementsExtensions
     /// <returns>辅助链式调用。</returns>
     public static TBuilder AddRawStatement<TBuilder>(this TBuilder builder,
         string rawText)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         var statement = new RawSourceTextBuilder(builder.Root)
         {
@@ -338,7 +422,7 @@ public static class AllowStatementsExtensions
     /// <returns>辅助链式调用。</returns>
     public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder,
         params ReadOnlySpan<string> rawTexts)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         foreach (var rawText in rawTexts)
         {
@@ -359,7 +443,7 @@ public static class AllowStatementsExtensions
     /// <returns>辅助链式调用。</returns>
     public static TBuilder AddRawStatements<TBuilder>(this TBuilder builder,
         IEnumerable<string> rawTexts)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         foreach (var rawText in rawTexts)
         {
@@ -382,7 +466,7 @@ public static class AllowStatementsExtensions
     public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
         string? header,
         Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         builder.AddBracketScope(header, "{", "}", codeBlockBuilder);
         return builder;
@@ -400,11 +484,39 @@ public static class AllowStatementsExtensions
     public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
         string? header, string startBracket, string endBracket,
         Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
-        where TBuilder : IAllowStatements
+        where TBuilder : IAllowStatement
     {
         var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
         {
-            WrapWithBracket = true,
+            IsBracketBlock = true,
+            Header = header,
+            StartBracket = startBracket,
+            EndBracket = endBracket,
+        };
+        codeBlockBuilder(codeBlock);
+        builder.AddNestedSourceCode(codeBlock);
+        return builder;
+    }
+
+    /// <summary>
+    /// 添加一个大括号作用域代码块。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="header">作用域头部代码，例如 if (condition) 等。</param>
+    /// <param name="startBracket">自定义起始括号。适用于有多层括号时的场景。</param>
+    /// <param name="endBracket">自定义结束括号。适用于有多层括号时的场景。</param>
+    /// <param name="isExpressionBody">整个代码块是否作为表达式主体使用。</param>
+    /// <param name="codeBlockBuilder">代码块构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddBracketScope<TBuilder>(this TBuilder builder,
+        string? header, string startBracket, string endBracket, bool isExpressionBody,
+        Action<CodeBlockSourceTextBuilder> codeBlockBuilder)
+        where TBuilder : IAllowStatement
+    {
+        var codeBlock = new CodeBlockSourceTextBuilder(builder.Root)
+        {
+            IsBracketBlock = true,
+            IsExpression = isExpressionBody,
             Header = header,
             StartBracket = startBracket,
             EndBracket = endBracket,

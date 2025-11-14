@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using System.Threading;
 
 namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;

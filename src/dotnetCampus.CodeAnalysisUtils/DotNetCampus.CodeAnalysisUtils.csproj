@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="**\*.g.cs" LinkBase="." />
+    <EmbeddedResource Include="**\*.cs" Exclude="**\*Generator.cs" LinkBase="." />
   </ItemGroup>
 
   <Target Name="_IncludeAllDependencies" BeforeTargets="_GetPackageFiles">

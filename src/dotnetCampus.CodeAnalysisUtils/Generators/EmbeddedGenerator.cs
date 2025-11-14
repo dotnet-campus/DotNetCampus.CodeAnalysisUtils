@@ -29,10 +29,13 @@ public class EmbeddedGenerator : IIncrementalGenerator
         foreach (var source in EmbeddedSourceFiles.Enumerate(null))
         {
             var name = source.FileRelativePath.Replace("/", ".").Replace("\\", ".");
-            var content = source.Content
+            var content = new StringBuilder()
+                .AppendLine("#nullable enable")
+                .Append(source.Content)
                 .Replace($"using {GeneratorInfo.RootNamespace}", $"using {rootNamespace}")
-                .Replace($"namespace {GeneratorInfo.RootNamespace}", $"namespace {rootNamespace}");
-            context.AddSource($"{rootNamespace}.{name}", SourceText.From(content, Encoding.UTF8));
+                .Replace($"namespace {GeneratorInfo.RootNamespace}", $"namespace {rootNamespace}")
+                .ToString();
+            context.AddSource($"{rootNamespace}/{name}", SourceText.From(content, Encoding.UTF8));
         }
     }
 }

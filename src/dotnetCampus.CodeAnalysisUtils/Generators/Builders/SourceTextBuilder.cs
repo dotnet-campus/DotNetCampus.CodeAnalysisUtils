@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,7 +9,7 @@ namespace DotNetCampus.CodeAnalysis.Utils.Generators.Builders;
 /// 辅助链式生成源代码文本的构建器。
 /// </summary>
 public class SourceTextBuilder : IDisposable,
-    IAllowScopedNamespace, IAllowTypeDeclaration, IAllowStatements
+    IAllowScopedNamespace, IAllowTypeDeclaration, IAllowStatement
 {
     private readonly HashSet<string> _systemUsings = [];
     private readonly HashSet<string> _otherUsings = [];
@@ -39,6 +38,11 @@ public class SourceTextBuilder : IDisposable,
     /// 是否使用文件作用域的命名空间。
     /// </summary>
     public bool UseFileScopedNamespace { get; init; } = true;
+
+    /// <summary>
+    /// 此源代码文件的可空注解上下文。
+    /// </summary>
+    public NullableAnnotationContext? Nullable { get; init; } = NullableAnnotationContext.Enable;
 
     /// <summary>
     /// 此源代码文件的命名空间。（目前一个源代码文件只支持一个命名空间。）
@@ -161,7 +165,17 @@ public class SourceTextBuilder : IDisposable,
     /// <inheritdoc cref="IndentSourceTextBuilder.BuildInto(IndentedStringBuilder)" />
     private void BuildInto(IndentedStringBuilder builder)
     {
-        builder.AppendLine("#nullable enable");
+        if (Nullable is { } nullable)
+        {
+            builder.AppendLine($"#nullable {nullable switch
+            {
+                NullableAnnotationContext.Disable => "disable",
+                NullableAnnotationContext.Enable => "enable",
+                NullableAnnotationContext.Warnings => "warnings",
+                NullableAnnotationContext.Annotations => "annotations",
+                _ => throw new ArgumentOutOfRangeException(nameof(nullable), nullable, "Unsupported NullableAnnotationContext value"),
+            }}");
+        }
 
         // usings
         foreach (var line in _systemUsings.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
@@ -379,12 +393,12 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 /// <param name="signature">方法签名行（如 "public void MyMethod()"）。</param>
 public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string signature) : IndentSourceTextBuilder(root),
-    IAllowStatements, IAllowMethodDeclaration, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
+    IAllowStatement, IAllowMethodDeclaration, IAllowDocumentationComment, IAllowAttributes, IAllowTypeConstraints
 {
     private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
     private AttributeListSourceTextBuilder? _attributeListBuilder;
     private TypeConstraintsSourceTextBuilder? _typeConstraintBuilder;
-    private readonly CodeBlockSourceTextBuilder _methodBody = new CodeBlockSourceTextBuilder(root);
+    private CodeBlockSourceTextBuilder? _methodBody;
 
     DocumentationCommentSourceTextBuilder IAllowDocumentationComment.DocumentationCommentBuilder =>
         _documentationCommentBuilder ??= new DocumentationCommentSourceTextBuilder(Root);
@@ -400,15 +414,25 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
     /// </summary>
     public string Signature { get; } = signature;
 
+    /// <summary>
+    /// 是否使用表达式主体（=>）来定义方法体。当设为 <see langword="true"/> 时，不会再自动添加大括号包裹，所有添加到方法体的语句都将视为表达式主体的一部分。
+    /// </summary>
+    public bool UseExpressionBody { get; init; }
+
+    private CodeBlockSourceTextBuilder MethodBody => _methodBody ??= new CodeBlockSourceTextBuilder(Root)
+    {
+        IsExpression = UseExpressionBody
+    };
+
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
     void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) =>
-        ((IAllowNestedSourceTextBuilder)_methodBody).AddNestedSourceCode(memberBuilder);
+        ((IAllowNestedSourceTextBuilder)MethodBody).AddNestedSourceCode(memberBuilder);
 
     /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
     public MethodDeclarationSourceTextBuilder AddRawText(string rawText)
     {
-        _methodBody.AddRawText(rawText);
+        MethodBody.AddRawText(rawText);
         return this;
     }
 
@@ -423,17 +447,51 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
         {
             attributeListBuilder.BuildInto(builder);
         }
-        builder.AppendLine(Signature);
-        if (_typeConstraintBuilder is { } typeConstraintBuilder)
+
+        if (UseExpressionBody)
         {
-            using (builder.IndentIn())
+            if (_typeConstraintBuilder is { } typeConstraintBuilder)
+            {
+                // 写入方法签名。
+                builder.AppendLine(Signature);
+                // 写入泛型约束。
+                typeConstraintBuilder.BuildInto(builder);
+                using (builder.IndentIn())
+                {
+                    // 写入表达式主体箭头。
+                    builder.Append("=> ");
+
+                    // 表达式主体：直接输出内容，最后加分号。
+                    MethodBody.BuildInto(builder);
+                    builder.AppendLine(";");
+                }
+            }
+            else
+            {
+                // 写入方法签名和表达式主体箭头。
+                builder.Append(Signature).Append(" => ");
+
+                // 表达式主体：直接输出内容，最后加分号。
+                MethodBody.BuildInto(builder);
+                builder.AppendLine(";");
+            }
+        }
+        else
+        {
+            // 写入方法签名。
+            builder.AppendLine(Signature);
+
+            // 写入泛型约束。
+            if (_typeConstraintBuilder is { } typeConstraintBuilder)
             {
                 typeConstraintBuilder.BuildInto(builder);
             }
-        }
-        using (new BracketScope(builder))
-        {
-            _methodBody.BuildInto(builder);
+
+            // 用大括号包裹方法体。
+            using (new BracketScope(builder))
+            {
+                MethodBody.BuildInto(builder);
+            }
         }
     }
 }
@@ -443,47 +501,53 @@ public class MethodDeclarationSourceTextBuilder(SourceTextBuilder root, string s
 /// </summary>
 /// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
 public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuilder(root),
-    IAllowStatements
+    IAllowStatement
 {
     private readonly List<IndentSourceTextBuilder> _statements = [];
 
     /// <summary>
-    /// 是否使用大括号包裹代码块。
+    /// 整个代码块作为表达式使用。Header、Footer 和中间语句不一定是表达式或语句（取决于 <see cref="IsPartExpression"/>）。
     /// </summary>
-    internal bool WrapWithBracket { get; init; }
+    public bool IsExpression { get; init; }
+
+    /// <summary>
+    /// 整个代码块作为语句或表达式使用（取决于 <see cref="IsExpression"/>），不过无论如何，Header、Footer 和中间的其他语句都是表达式的一部分，共同组成这个语句。
+    /// </summary>
+    public bool IsPartExpression { get; init; }
+
+    /// <summary>
+    /// 代码块包裹在一组大括号中。取决于 <see cref="IsExpression"/>，可能整个大括号都会成为一个表达式。
+    /// </summary>
+    public bool IsBracketBlock { get; init; }
+
+    /// <summary>
+    /// 代码块是行分隔符。
+    /// </summary>
+    public bool IsLineSeparator { get; init; }
 
     /// <summary>
     /// 代码块的头部文本。如果不为 <see langword="null"/>，则在代码块开始前添加此文本。<br/>
-    /// 适用于构建 if (xxx), _ => xxx switch 等需要在代码块前添加头部文本的场景。
+    /// 适用于构建 if (xxx), return xxx 等需要在代码块前添加头部文本的场景。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string? Header { get; init; }
 
     /// <summary>
-    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
-    /// 适用于构建 => { 等需要在代码块前添加头部文本的场景。
+    /// 代码块的尾部文本。如果不为 <see langword="null"/>，则在代码块结束后添加此文本。<br/>
+    /// 适用于构建 }); 或表达式结尾的 ; 等场景。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
+    internal string? Footer { get; init; }
+
+    /// <summary>
+    /// 自定义起始括号。仅当 <see cref="IsBracketBlock"/> 为 <see langword="true"/> 时有效。<br/>
+    /// 如果不设置，则使用默认的大括号 "{"。
+    /// </summary>
     internal string StartBracket { get; init; } = "{";
 
     /// <summary>
-    /// 自定义大括号。如果不设置，则使用默认的大括号 "{" 和 "}"。<br/>
-    /// 适用于 }); 等这种大括号后还有尾部文本的场景。
+    /// 自定义结束括号。仅当 <see cref="IsBracketBlock"/> 为 <see langword="true"/> 时有效。<br/>
+    /// 如果不设置，则使用默认的大括号 "}"。
     /// </summary>
-    /// <remarks>
-    /// 当 <see cref="WrapWithBracket"/> 为 <see langword="true"/> 时，此属性才有效。
-    /// </remarks>
     internal string EndBracket { get; init; } = "}";
-
-    /// <summary>
-    /// 指示这是否是一个用于分隔上下代码块的空行。<br/>
-    /// 如果是，则在生成代码时会在此代码块前后各添加一个空行。
-    /// </summary>
-    internal bool IsLineSeparator { get; init; }
 
     void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
 
@@ -503,33 +567,102 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
     /// <inheritdoc />
     public override void BuildInto(IndentedStringBuilder builder)
     {
-        for (var i = 0; i < _statements.Count; i++)
+        BuildInto(builder, null);
+    }
+
+    /// <summary>
+    /// 构建代码块到 <see cref="IndentedStringBuilder"/> 中。
+    /// </summary>
+    /// <param name="builder">要构建到的 <see cref="IndentedStringBuilder"/> 实例。</param>
+    /// <param name="expectExpressionPart">是否期望此代码块作为父代码块表达式的一部分。</param>
+    private void BuildInto(IndentedStringBuilder builder, bool? expectExpressionPart)
+    {
+        if (IsLineSeparator)
         {
-            var statement = _statements[i];
-            var isLineSeparator = statement is CodeBlockSourceTextBuilder { IsLineSeparator: true } && i > 0 && i < _statements.Count - 1;
-            if (isLineSeparator)
-            {
-                builder.AppendLine();
-                continue;
-            }
+            // 空行分隔符，不输出任何内容
+            return;
+        }
 
-            if (statement is CodeBlockSourceTextBuilder { WrapWithBracket: true } codeBlock)
+        if (Header is { } header)
+        {
+            if (IsPartExpression && !IsBracketBlock)
             {
-                if (codeBlock.Header is { } header)
-                {
-                    builder.AppendLine(header);
-                }
-
-                using (new BracketScope(builder, 1, codeBlock.StartBracket, codeBlock.EndBracket))
-                {
-                    codeBlock.BuildInto(builder);
-                }
+                builder.Append(header);
             }
             else
             {
-                statement.BuildInto(builder);
+                builder.AppendLine(header);
             }
         }
+
+        // 判断最后一个子元素是否应该作为表达式的一部分（不换行）
+        var shouldLastStatementBeExpressionPart = Footer is not null
+            // 有 Footer 时，只有 IsPartExpression 为 true 才作为表达式一部分
+            ? IsPartExpression
+            // 没有 Footer 时，父代码块期望当前代码块为表达式的一部分，或当前代码块本身标记为表达式时，也传递给最后一个子元素
+            : (expectExpressionPart is true || IsExpression);
+
+        if (IsBracketBlock)
+        {
+            using (new BracketScope(builder, 1, StartBracket, EndBracket, shouldLastStatementBeExpressionPart))
+            {
+                // 大括号内的子元素都正常换行，不受父级影响
+                for (var i = 0; i < _statements.Count; i++)
+                {
+                    _statements[i].BuildInto(builder);
+                }
+            }
+        }
+        else
+        {
+            // 非大括号块：除最后一个元素外，其他元素都正常换行
+            for (var i = 0; i < _statements.Count - 1; i++)
+            {
+                _statements[i].BuildInto(builder);
+            }
+
+            // 最后一个元素：如果是 CodeBlockSourceTextBuilder 且需要作为表达式的一部分，则递归传递标志
+            if (_statements.Count > 0)
+            {
+                var lastStatement = _statements[^1];
+                if (shouldLastStatementBeExpressionPart && lastStatement is CodeBlockSourceTextBuilder codeLast)
+                {
+                    // 递归告诉最后一个子代码块：你是表达式的一部分，不要在末尾换行
+                    codeLast.BuildInto(builder, true);
+                }
+                else if (shouldLastStatementBeExpressionPart && lastStatement is RawSourceTextBuilder rawLast)
+                {
+                    // 递归告诉最后一个子代码块：你是表达式的一部分，不要在末尾换行
+                    rawLast.BuildInto(builder, true);
+                }
+                else
+                {
+                    // 非 CodeBlockSourceTextBuilder 或不需要作为表达式的一部分，正常输出
+                    lastStatement.BuildInto(builder);
+                }
+            }
+        }
+
+        if (Footer is { } footer)
+        {
+            if (expectExpressionPart is true || IsExpression)
+            {
+                builder.Append(footer);
+            }
+            else
+            {
+                builder.AppendLine(footer);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 返回用于调试的对象状态信息，仅供调试器或日志查看使用。
+    /// </summary>
+    /// <returns>表示当前对象状态的调试信息字符串。</returns>
+    public override string ToString()
+    {
+        return $"{Header ?? "<NO_HEADER>"}+{_statements.Count}+{Footer ?? "<NO_FOOTER>"}";
     }
 }
 
@@ -548,6 +681,23 @@ public class RawSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuil
     public override void BuildInto(IndentedStringBuilder builder)
     {
         builder.AppendLine(RawText);
+    }
+
+    /// <summary>
+    /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="expectExpressionPart">是否期望此代码块作为父代码块表达式的一部分。</param>
+    public void BuildInto(IndentedStringBuilder builder, bool expectExpressionPart)
+    {
+        if (expectExpressionPart)
+        {
+            builder.Append(RawText);
+        }
+        else
+        {
+            builder.AppendLine(RawText);
+        }
     }
 }
 
@@ -751,6 +901,36 @@ public class TypeConstraintsSourceTextBuilder(SourceTextBuilder root) : IndentSo
 }
 
 /// <summary>
+/// 可空注解上下文。
+/// </summary>
+public enum NullableAnnotationContext
+{
+    /// <summary>
+    /// 代码为可空忽略状态。禁用时的行为与启用可空引用类型之前一致，但新语法会产生警告而不是错误。
+    /// <para>The code is nullable-oblivious. Disable matches the behavior before nullable reference types were enabled, except the new syntax produces warnings instead of errors.</para>
+    /// </summary>
+    Disable,
+
+    /// <summary>
+    /// 编译器启用所有空引用分析和所有语言特性。
+    /// <para>The compiler enables all null reference analysis and all language features.</para>
+    /// </summary>
+    Enable,
+
+    /// <summary>
+    /// 编译器执行所有空引用分析，并在代码可能解引用 null 时发出警告。
+    /// <para>The compiler performs all null analysis and emits warnings when code might dereference null.</para>
+    /// </summary>
+    Warnings,
+
+    /// <summary>
+    /// 编译器不会在代码可能解引用 null 或将可能为 null 的表达式赋值给非可空变量时发出警告。
+    /// <para>The compiler doesn't emit warnings when code might dereference null, or when you assign a maybe-null expression to a non-nullable variable.</para>
+    /// </summary>
+    Annotations,
+}
+
+/// <summary>
 /// 可自动添加大括号作用域的辅助类。
 /// </summary>
 file readonly ref struct BracketScope : IDisposable
@@ -758,8 +938,9 @@ file readonly ref struct BracketScope : IDisposable
     private readonly IndentedStringBuilder _builder;
     private readonly IndentedStringBuilder.IndentScope _indentScope;
     private readonly string? _endBracket;
+    private readonly bool _isPartOfExpression;
 
-    public BracketScope(IndentedStringBuilder builder, int levels = 1, string? startBracket = "{", string? endBracket = "}")
+    public BracketScope(IndentedStringBuilder builder, int levels = 1, string? startBracket = "{", string? endBracket = "}", bool isPartOfExpression = false)
     {
         _builder = builder;
         if (startBracket is not null)
@@ -767,6 +948,7 @@ file readonly ref struct BracketScope : IDisposable
             _builder.AppendLine(startBracket);
         }
         _endBracket = endBracket;
+        _isPartOfExpression = isPartOfExpression;
         _indentScope = builder.IndentIn(levels);
     }
 
@@ -775,7 +957,14 @@ file readonly ref struct BracketScope : IDisposable
         _indentScope.Dispose();
         if (_endBracket is { } bracket)
         {
-            _builder.AppendLine(bracket);
+            if (_isPartOfExpression)
+            {
+                _builder.Append(bracket);
+            }
+            else
+            {
+                _builder.AppendLine(bracket);
+            }
         }
     }
 }

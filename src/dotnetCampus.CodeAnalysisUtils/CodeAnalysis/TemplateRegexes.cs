@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace DotNetCampus.CodeAnalysis.Utils.CodeAnalysis;
 
