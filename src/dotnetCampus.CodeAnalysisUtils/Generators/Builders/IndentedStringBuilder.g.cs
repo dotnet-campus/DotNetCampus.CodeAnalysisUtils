@@ -366,7 +366,7 @@ public class IndentedStringBuilder
         if (_lineBuffer.Length > 0)
         {
             // 临时将 _lineBuffer 的内容写入，但不清空 _lineBuffer。
-            var tempBuilder = new StringBuilder(_builder.Length + _lineBuffer.Length * 2);
+            var tempBuilder = new StringBuilder(_builder.Length + Indentation.Length * IndentLevel + _lineBuffer.Length);
             tempBuilder.Append(_builder);
 
             // 应用缩进并写入 _lineBuffer 的内容。
