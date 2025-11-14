@@ -30,12 +30,12 @@ public class EmbeddedGenerator : IIncrementalGenerator
         {
             var name = source.FileRelativePath.Replace("/", ".").Replace("\\", ".");
             var content = new StringBuilder()
-                .Append("#nullable enable")
+                .AppendLine("#nullable enable")
                 .Append(source.Content)
                 .Replace($"using {GeneratorInfo.RootNamespace}", $"using {rootNamespace}")
                 .Replace($"namespace {GeneratorInfo.RootNamespace}", $"namespace {rootNamespace}")
                 .ToString();
-            context.AddSource($"{rootNamespace}.{name}", SourceText.From(content, Encoding.UTF8));
+            context.AddSource($"{rootNamespace}/{name}", SourceText.From(content, Encoding.UTF8));
         }
     }
 }
