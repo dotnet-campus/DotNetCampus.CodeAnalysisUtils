@@ -137,9 +137,7 @@ public class IndentedStringBuilder
         if (_lineBuffer.Length > 0)
         {
             // 在添加原始字符串之前，立即把行缓冲区的内容写入。
-#pragma warning disable CS0618 // 危险 API 调用
-            FinalAppendLine(_lineBuffer.ToString().AsSpan(), true);
-#pragma warning restore CS0618 // 危险 API 调用
+            FinalFlushBuffer();
         }
 
         // 直接添加原始字符串，不进行任何处理。
@@ -180,8 +178,7 @@ public class IndentedStringBuilder
                 if (appendFinalNewLine)
                 {
                     // 直接写入到最终字符串中
-                    FinalAppendLine(leftPart);
-                    _lineBuffer.Clear();
+                    FinalFlushBuffer().FinalAppendLine(leftPart);
                     return this;
                 }
                 else
@@ -196,44 +193,45 @@ public class IndentedStringBuilder
             var line = leftPart[..newLineIndex].TrimEnd('\r');
             leftPart = leftPart[(newLineIndex + 1)..];
 
-            FinalAppendLine(line);
+            FinalFlushBuffer().FinalAppendLine(line);
             _lineBuffer.Clear();
         }
         // 如果传入的文本 text 以换行符结尾，上述循环则没有提前退出，此时需要再补一个换行符。
         if (appendFinalNewLine)
         {
-            FinalAppendLine(_lineBuffer.ToString().AsSpan());
+            FinalFlushBuffer().FinalAppendLine([]);
             _lineBuffer.Clear();
         }
         return this;
     }
 
     /// <summary>
-    /// 视参数 <paramref name="line"/> 为单行文本（不包含换行符），并将其写入到最终字符串中。考虑缩进，且在末尾添加换行符。
+    /// 将行缓冲区中的内容写入到最终字符串中，并清空行缓冲区。<br/>
+    /// 注意，此方法会破坏 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），<br/>
+    /// 除非在某段代码中，打算先添加行的一部分，随后立即会添加剩余部分（这样做能避免额外分配一整行的字符串）。
     /// </summary>
-    /// <param name="line">单行文本。</param>
     /// <returns>辅助链式调用。</returns>
-    private IndentedStringBuilder FinalAppendLine(ReadOnlySpan<char> line)
+    private IndentedStringBuilder FinalFlushBuffer()
     {
-#pragma warning disable CS0618 // 危险 API 调用
-        return FinalAppendLine(line, false);
-#pragma warning restore CS0618 // 危险 API 调用
+        if (_lineBuffer.Length > 0)
+        {
+            FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
+            _lineBuffer.Clear();
+        }
+        return this;
     }
 
     /// <summary>
-    /// 视参数 <paramref name="line"/> 为单行文本（不包含换行符），并将其写入到最终字符串中。考虑缩进，且在末尾添加换行符。
+    /// 视参数 <paramref name="line"/> 为完整的单行文本（不包含换行符），并将其写入到最终字符串中。考虑缩进，且在末尾添加换行符。
     /// </summary>
     /// <param name="line">单行文本。</param>
-    /// <param name="dangerousSuppressNewLine">
-    /// 是否危险地禁止添加换行符。<br/>
-    /// 正常会在行末添加换行符，以确保 <see cref="_builder"/> 中的内容一定包含完整的缩进，拥有正确的换行符，且末尾一定有换行符。<br/>
-    /// 但是，有些危险的 API（<see cref="AppendRaw"/> 和 <see cref="AppendRawLine"/>）希望直接操作最终字符串，这会跳过 <see cref="_lineBuffer"/> 带来的缩进和换行符保证，也会跳过特殊行处理操作。<br/>
-    /// 被这些危险的 API 调用后，<see cref="_builder"/> 不再能保证缩进正确，换行符统一，也无法保证末尾必然有换行符。<br/>
-    /// 除危险 API 之外的其他 API 都不会传入 <see langword="true"/>，危险 API 的使用者应正确处理这些后果。
+    /// <param name="appendNewLine">
+    /// 是否在末尾添加换行符。<br/>
+    /// 为了确保 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），一般都应该传入 <see langword="true"/>；
+    /// 除非在某段代码中，打算先添加行的一部分，随后立即会添加剩余部分（这样做能避免额外分配一整行的字符串）。
     /// </param>
     /// <returns>辅助链式调用。</returns>
-    [Obsolete("仅供危险 API 使用，其他代码不应调用此方法。")]
-    private IndentedStringBuilder FinalAppendLine(ReadOnlySpan<char> line, bool dangerousSuppressNewLine)
+    private IndentedStringBuilder FinalAppendLine(ReadOnlySpan<char> line, bool appendNewLine = true)
     {
         var result = ProcessLine(line);
         if (result.Type is IndentLineType.NormalLine)
@@ -254,7 +252,7 @@ public class IndentedStringBuilder
         {
             throw new InvalidOperationException($"未知的行处理结果：{result}");
         }
-        if (!dangerousSuppressNewLine)
+        if (appendNewLine)
         {
             _builder.Append(NewLine);
         }
@@ -377,9 +375,7 @@ public class IndentedStringBuilder
     public override string ToString()
     {
         var oldLength = _builder.Length;
-#pragma warning disable CS0618 // 危险 API 调用
-        FinalAppendLine(_lineBuffer.ToString().AsSpan(), true);
-#pragma warning restore CS0618 // 危险 API 调用
+        FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
         var finalText = _builder.ToString();
         _builder.Length = oldLength;
         return finalText;
