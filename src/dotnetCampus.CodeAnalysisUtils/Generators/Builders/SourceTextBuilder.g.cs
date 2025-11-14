@@ -616,10 +616,15 @@ public class CodeBlockSourceTextBuilder(SourceTextBuilder root) : IndentSourceTe
             if (_statements.Count > 0)
             {
                 var lastStatement = _statements[^1];
-                if (shouldLastStatementBeExpressionPart && lastStatement is CodeBlockSourceTextBuilder last)
+                if (shouldLastStatementBeExpressionPart && lastStatement is CodeBlockSourceTextBuilder codeLast)
                 {
                     // 递归告诉最后一个子代码块：你是表达式的一部分，不要在末尾换行
-                    last.BuildInto(builder, true);
+                    codeLast.BuildInto(builder, true);
+                }
+                else if (shouldLastStatementBeExpressionPart && lastStatement is RawSourceTextBuilder rawLast)
+                {
+                    // 递归告诉最后一个子代码块：你是表达式的一部分，不要在末尾换行
+                    rawLast.BuildInto(builder, true);
                 }
                 else
                 {
@@ -667,6 +672,23 @@ public class RawSourceTextBuilder(SourceTextBuilder root) : IndentSourceTextBuil
     public override void BuildInto(IndentedStringBuilder builder)
     {
         builder.AppendLine(RawText);
+    }
+
+    /// <summary>
+    /// 将生成的源代码文本写入指定的 <see cref="StringBuilder"/> 实例中。
+    /// </summary>
+    /// <param name="builder">源代码文本将被写入到此实例中。</param>
+    /// <param name="expectExpressionPart">是否期望此代码块作为父代码块表达式的一部分。</param>
+    public void BuildInto(IndentedStringBuilder builder, bool expectExpressionPart)
+    {
+        if (expectExpressionPart)
+        {
+            builder.Append(RawText);
+        }
+        else
+        {
+            builder.AppendLine(RawText);
+        }
     }
 }
 
