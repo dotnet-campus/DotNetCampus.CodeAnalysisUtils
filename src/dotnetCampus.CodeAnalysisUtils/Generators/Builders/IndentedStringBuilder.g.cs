@@ -137,7 +137,8 @@ public class IndentedStringBuilder
         if (_lineBuffer.Length > 0)
         {
             // 在添加原始字符串之前，立即把行缓冲区的内容写入。
-            FinalFlushBuffer();
+            FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
+            _lineBuffer.Clear();
         }
 
         // 直接添加原始字符串，不进行任何处理。
@@ -178,7 +179,7 @@ public class IndentedStringBuilder
                 if (appendFinalNewLine)
                 {
                     // 直接写入到最终字符串中
-                    FinalFlushBuffer().FinalAppendLine(leftPart);
+                    FlushAndFinalAppendLine(leftPart);
                     return this;
                 }
                 else
@@ -193,32 +194,39 @@ public class IndentedStringBuilder
             var line = leftPart[..newLineIndex].TrimEnd('\r');
             leftPart = leftPart[(newLineIndex + 1)..];
 
-            FinalFlushBuffer().FinalAppendLine(line);
-            _lineBuffer.Clear();
+            FlushAndFinalAppendLine(line);
         }
         // 如果传入的文本 text 以换行符结尾，上述循环则没有提前退出，此时需要再补一个换行符。
         if (appendFinalNewLine)
         {
-            FinalFlushBuffer().FinalAppendLine([]);
-            _lineBuffer.Clear();
+            FlushAndFinalAppendLine([]);
         }
         return this;
     }
 
     /// <summary>
-    /// 将行缓冲区中的内容写入到最终字符串中，并清空行缓冲区。<br/>
-    /// 注意，此方法会破坏 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），<br/>
-    /// 除非在某段代码中，打算先添加行的一部分，随后立即会添加剩余部分（这样做能避免额外分配一整行的字符串）。
+    /// 如果行缓冲区中存在内容，则将其与 <paramref name="text"/> 的内容一起拼成完整的一行，写入到最终字符串中。考虑缩进，并在末尾添加换行符。<br/>
+    /// 如果缓冲区为空，则直接将 <paramref name="text"/> 视为完整的一行，写入到最终字符串中。
     /// </summary>
     /// <returns>辅助链式调用。</returns>
-    private IndentedStringBuilder FinalFlushBuffer()
+    private IndentedStringBuilder FlushAndFinalAppendLine(ReadOnlySpan<char> text)
     {
         if (_lineBuffer.Length > 0)
         {
-            FinalAppendLine(_lineBuffer.ToString().AsSpan(), false);
+            // 因为我们存在行处理程序，所以必须生成完整的一行文本，不能分次处理。
+            var totalLength = _lineBuffer.Length + text.Length;
+            Span<char> line = totalLength <= 256
+                ? stackalloc char[totalLength]
+                : new char[totalLength];
+            _lineBuffer.CopyTo(0, line, _lineBuffer.Length);
+            text.CopyTo(line.Slice(_lineBuffer.Length));
             _lineBuffer.Clear();
+            return FinalAppendLine(line);
         }
-        return this;
+        else
+        {
+            return FinalAppendLine(text);
+        }
     }
 
     /// <summary>
@@ -227,8 +235,9 @@ public class IndentedStringBuilder
     /// <param name="line">单行文本。</param>
     /// <param name="appendNewLine">
     /// 是否在末尾添加换行符。<br/>
-    /// 为了确保 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），一般都应该传入 <see langword="true"/>；
-    /// 除非在某段代码中，打算先添加行的一部分，随后立即会添加剩余部分（这样做能避免额外分配一整行的字符串）。
+    /// 为了确保 <see cref="_builder"/> 中内容的正确性（正确的缩进、统一的换行符，末尾必然有换行符），一般都应该传入 <see langword="true"/>；除非允许破坏这种设定。<br/>
+    /// <see cref="ToString"/> 只用来输出，随后就会还原更改，所以虽然传入了 <see langword="false"/>，但不会破坏这种设定。<br/>
+    /// AppendRaw 系列方法会破坏这种设定，但它们设计如此，需要业务开发者自行评估风险并修复问题。
     /// </param>
     /// <returns>辅助链式调用。</returns>
     private IndentedStringBuilder FinalAppendLine(ReadOnlySpan<char> line, bool appendNewLine = true)
@@ -494,6 +503,15 @@ file static class Extensions
         foreach (var c in value)
         {
             builder.Append(c);
+        }
+        return builder;
+    }
+
+    public static StringBuilder CopyTo(this StringBuilder builder, int sourceIndex, Span<char> value, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            value[i] = builder[sourceIndex + i];
         }
         return builder;
     }
