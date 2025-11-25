@@ -452,13 +452,31 @@ public static class IndentLineProcessors
 
     private static IndentLineProcessedResult ProcessCSharpCodeLine(ReadOnlySpan<char> line)
     {
-        // 查看当前行是否满足：行首是空白字符，随后紧跟着预处理命令 # 字符。
+        // 查看当前行是否满足：行首是空白字符，随后紧跟着预处理命令 # 字符，随后必须是字母或某些符号（! :）
+        // #!/usr/bin/dotnet run
+        // #:sdk Microsoft.NET.Sdk
+        // #:package Aspire.Hosting.AppHost@9.3.0
+        // #:property UserSecretsId 2eec9746-c21a-4933-90af-c22431f35459
+
         var index = line.GetTrimmedIndex();
-        return index < line.Length && line[index] == '#'
-            // 是预处理命令行，直接写入，不考虑缩进。
-            ? new IndentLineProcessedResult(IndentLineType.NoIndentLine, index, line.Length - index)
-            // 不是预处理命令行，视为普通代码行，考虑缩进。
-            : new IndentLineProcessedResult(IndentLineType.NormalLine, 0, line.Length);
+        if (index >= line.Length)
+        {
+            // 说明整行都是空白字符，直接全部删除。
+            return new IndentLineProcessedResult(IndentLineType.NoIndentLine);
+        }
+
+        if (line[index] is '#' && index + 1 < line.Length)
+        {
+            var nextChar = line[index + 1];
+            if (char.IsLetter(nextChar) || nextChar is '!' or ':')
+            {
+                // 是预处理命令行，直接写入，不考虑缩进。
+                return new IndentLineProcessedResult(IndentLineType.NoIndentLine, index, line.Length - index);
+            }
+        }
+
+        // 不是预处理命令行，视为普通代码行，考虑缩进。
+        return new IndentLineProcessedResult(IndentLineType.NormalLine, 0, line.Length);
     }
 
     private static int GetTrimmedIndex(this ReadOnlySpan<char> span)
