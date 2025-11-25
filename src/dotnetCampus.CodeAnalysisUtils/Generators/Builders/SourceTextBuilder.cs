@@ -78,6 +78,15 @@ public class SourceTextBuilder : IDisposable,
     public bool ShouldPrependGlobal { get; init; } = true;
 
     /// <summary>
+    /// 是否移除预处理指令行（如 #if、#region 等）的缩进。默认为 <see langword="false"/>。
+    /// </summary>
+    /// <remarks>
+    /// 此选项基于简单的行文本匹配，因此在少数字符串字面量中可能出现 “#if” 等内容时会误判为预处理行。<br/>
+    /// 若你的生成源码可能包含这些情况，请勿开启此选项。
+    /// </remarks>
+    public bool RemoveIndentForPreprocessorLines { get; init; }
+
+    /// <summary>
     /// 添加 using 引用的命名空间。
     /// </summary>
     /// <param name="usingNamespace">要引用的命名空间。</param>
@@ -156,7 +165,9 @@ public class SourceTextBuilder : IDisposable,
         {
             Indentation = Indentation,
             NewLine = NewLine,
-            LineProcessor = IndentLineProcessors.CSharp,
+            LineProcessor = RemoveIndentForPreprocessorLines
+                ? IndentLineProcessors.CSharp
+                : null,
         };
         BuildInto(builder);
         return builder.ToString();
