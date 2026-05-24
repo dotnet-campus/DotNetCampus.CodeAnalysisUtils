@@ -115,4 +115,23 @@ public static partial class FlowSourceTextBuilderExtensions
         var builder = new ConditionSourceTextBuilder<TBuilder>(originalBuilder);
         return builder.Condition(condition, action);
     }
+
+    /// <summary>
+    /// 当 <paramref name="condition"/> 为 <see langword="true"/> 时执行 <paramref name="action"/>，否则什么也不做。
+    /// 与 <see cref="Condition{TBuilder}"/> 不同，此方法直接返回原始构建器，无需调用 <c>EndCondition()</c>，
+    /// 适合只有单个条件分支而不需要 else 的场景。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="condition">条件。</param>
+    /// <param name="action">条件为 true 时执行的操作。</param>
+    /// <typeparam name="TBuilder">原始的源代码构建器。</typeparam>
+    /// <returns>原始构建器。</returns>
+    public static TBuilder If<TBuilder>(this TBuilder builder, bool condition, Action<TBuilder> action)
+    {
+        if (condition)
+        {
+            action(builder);
+        }
+        return builder;
+    }
 }
