@@ -105,6 +105,32 @@ public static class SourceTextBuilderBaseExtensions
     {
         return builder;
     }
+
+    /// <summary>
+    /// 添加一大段内插字符串作为源代码文本的一部分。<br/>
+    /// 在这段内插字符串中，可使用 <see cref="IInterpolatedTemplateSourceTextBuilder"/> 添加特殊标记，
+    /// 以便能在保持插入代码简洁的同时，能处理好条件、换行等很影响内插字符串阅读和修改体验的片段。
+    /// </summary>
+    /// <param name="builder">辅助链式调用。</param>
+    /// <param name="interpolatedTextBuilder">
+    /// 使用以下方式添加内插字符串：
+    /// <code>
+    /// i => $$"""
+    ///     // 请在这里添加大量代码
+    ///     // {{i.Xxx()}}
+    /// """;
+    /// </code>
+    /// </param>
+    /// <returns>辅助链式调用。</returns>
+    public static TBuilder AddInterpolatedText<TBuilder>(this TBuilder builder, Func<IInterpolatedTemplateSourceTextBuilder, string> interpolatedTextBuilder)
+        where TBuilder : ISourceTextBuilder
+    {
+        var interpolatedBuilder = new InterpolatedTemplateSourceTextBuilder();
+        interpolatedTextBuilder(interpolatedBuilder);
+        var text = interpolatedBuilder.ToString();
+        builder.AddRawText(text);
+        return builder;
+    }
 }
 
 /// <summary>
