@@ -334,6 +334,21 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
         _typeConstraintBuilder ??= new TypeConstraintsSourceTextBuilder(Root);
 
     /// <summary>
+    /// 为此类型声明添加扩展成员声明。
+    /// </summary>
+    /// <param name="receiverParameter">一个接收参数，也是被扩展的类型和输入参数。</param>
+    /// <param name="extensionMemberDeclarationBuilder">扩展成员声明构建器。</param>
+    /// <returns>辅助链式调用。</returns>
+    public TypeDeclarationSourceTextBuilder AddExtensionDeclaration(string receiverParameter,
+        Action<ExtensionMemberDeclarationSourceTextBuilder> extensionMemberDeclarationBuilder)
+    {
+        var extensionDeclaration = new ExtensionMemberDeclarationSourceTextBuilder(Root, receiverParameter);
+        extensionMemberDeclarationBuilder(extensionDeclaration);
+        ((IAllowNestedSourceTextBuilder)this).AddNestedSourceCode(extensionDeclaration);
+        return this;
+    }
+
+    /// <summary>
     /// 为此类型声明添加基类或接口。
     /// </summary>
     /// <param name="baseTypes">要添加的基类或接口名称。</param>
@@ -389,6 +404,57 @@ public class TypeDeclarationSourceTextBuilder(SourceTextBuilder root, string dec
                 builder.Append(_baseTypes[i]);
             }
         }
+        builder.AppendLine();
+
+        using (new BracketScope(builder))
+        {
+            BuildMembersInto(builder, _members);
+        }
+    }
+}
+
+/// <summary>
+/// 扩展成员声明源代码文本构建器。
+/// </summary>
+/// <param name="root">根 <see cref="SourceTextBuilder"/> 实例。</param>
+/// <param name="receiverParameter">一个接收参数，也是被扩展的类型和输入参数。</param>
+public class ExtensionMemberDeclarationSourceTextBuilder(SourceTextBuilder root, string receiverParameter) : IndentSourceTextBuilder(root),
+    IAllowMemberDeclaration, IAllowDocumentationComment
+{
+    private DocumentationCommentSourceTextBuilder? _documentationCommentBuilder;
+    private readonly List<IndentSourceTextBuilder> _members = [];
+
+    /// <summary>
+    /// 一个接收参数，也是被扩展的类型和输入参数。
+    /// </summary>
+    public string ReceiverParameter { get; } = receiverParameter;
+
+    DocumentationCommentSourceTextBuilder IAllowDocumentationComment.DocumentationCommentBuilder =>
+        _documentationCommentBuilder ??= new DocumentationCommentSourceTextBuilder(Root);
+
+    void ISourceTextBuilder.AddRawText(string rawText) => AddRawText(rawText);
+
+    void IAllowNestedSourceTextBuilder.AddNestedSourceCode(IndentSourceTextBuilder memberBuilder) => _members.Add(memberBuilder);
+
+    /// <inheritdoc cref="ISourceTextBuilder.AddRawText" />
+    public ExtensionMemberDeclarationSourceTextBuilder AddRawText(string rawText)
+    {
+        var rawDeclaration = new RawSourceTextBuilder(Root)
+        {
+            RawText = rawText,
+        };
+        _members.Add(rawDeclaration);
+        return this;
+    }
+
+    /// <inheritdoc />
+    public override void BuildInto(IndentedStringBuilder builder)
+    {
+        if (_documentationCommentBuilder is { } documentationCommentBuilder)
+        {
+            documentationCommentBuilder.BuildInto(builder);
+        }
+        builder.Append($"extension({ReceiverParameter})");
         builder.AppendLine();
 
         using (new BracketScope(builder))
